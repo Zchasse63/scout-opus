@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Scout",
+    "slug": "scout-fitness",
+    "version": "0.1.0",
+    "scheme": "scout",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.scoutfitness.app",
+      "buildNumber": "1",
+      "entitlements": {
+        "keychain-access-groups": ["group.com.scoutfitness.app"],
+        "com.apple.developer.associated-domains": ["applinks:scoutfitness.app"]
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "The app uses your calendar to detect upcoming trips for gym recommendations."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "scout-fitness-app"
+      }
+    }
+  }
+}

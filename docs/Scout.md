@@ -1,0 +1,14 @@
+Project Info
+
+
+Supabase project_ref=wxepvxrpkaehqkujzzqn
+
+Supabase URL - https://wxepvxrpkaehqkujzzqn.supabase.co
+
+Supabase Anon Key - eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZXB2eHJwa2FlaHFrdWp6enFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwODg0NzIsImV4cCI6MjA3OTY2NDQ3Mn0.kmEDfcbu570RnKprUje9a_HdYYzTOZ8dLGtDzDcKMd4
+
+Supabase Service Role Key - eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4ZXB2eHJwa2FlaHFrdWp6enFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwODg0NzIsImV4cCI6MjA3OTY2NDQ3Mn0.kmEDfcbu570RnKprUje9a_HdYYzTOZ8dLGtDzDcKMd4
+
+Github URL - https://github.com/Zchasse63/opus-scout.git
+
+Google API Key - AIzaSyAxLUAq-pFXbZOYtgr1c9YUiu7NKv7Nd4g
