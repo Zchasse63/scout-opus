@@ -1,4 +1,62 @@
 import { create } from 'zustand';
+import { supabase } from '../lib/supabase';
+
+// Helper: Calculate distance between two coordinates in miles
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10; // Round to 1 decimal
+}
+
+// Helper: Extract amenities from Google Places data
+function extractAmenities(place: any): string[] {
+  const amenities: string[] = [];
+
+  // Check for common gym amenities based on place types or features
+  // Note: Google Places API doesn't provide detailed amenities, so we infer from data
+  if (place.types?.includes('spa')) amenities.push('Spa');
+  if (place.types?.includes('swimming_pool')) amenities.push('Pool');
+
+  // If place has generative summary, we could parse it for amenities
+  // For now, return common defaults
+  if (amenities.length === 0) {
+    return ['Weights', 'Cardio'];
+  }
+
+  return amenities;
+}
+
+// Helper: Check if place is currently open
+function isPlaceOpen(openingHours: any): boolean {
+  if (!openingHours?.periods) return false;
+
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sunday
+  const currentTime = now.getHours() * 100 + now.getMinutes();
+
+  const todaysPeriods = openingHours.periods.filter(
+    (period: any) => period.open?.day === dayOfWeek
+  );
+
+  for (const period of todaysPeriods) {
+    const openTime = parseInt(period.open?.time || '0000', 10);
+    const closeTime = parseInt(period.close?.time || '2359', 10);
+
+    if (currentTime >= openTime && currentTime <= closeTime) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 export interface SearchFilters {
   facilityTypes: string[];
@@ -156,42 +214,112 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
   search: async () => {
     const { query, location, filters } = get();
 
+    if (!location) {
+      set({ error: 'Location required for search', isLoading: false });
+      return;
+    }
+
     set({ isLoading: true, error: null });
 
     try {
-      // TODO: Implement actual search API call
-      // This would call your places-search Edge Function
+      // Build search query - include amenities/facility types in query if filtered
+      let searchQuery = query.trim() || 'gym fitness center';
 
-      // For now, simulate with a delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Add filter terms to query for better Google Places results
+      if (filters.facilityTypes.length > 0) {
+        searchQuery += ` ${filters.facilityTypes.join(' ')}`;
+      }
+      if (filters.amenities.length > 0) {
+        searchQuery += ` ${filters.amenities.slice(0, 3).join(' ')}`; // Limit to 3 amenities
+      }
 
-      // Mock results
-      const mockResults: SearchResult[] = [
-        {
-          id: '1',
-          name: 'Iron Temple Fitness',
-          address: '123 Main St, Tampa, FL 33601',
-          latitude: 27.9506,
-          longitude: -82.4572,
-          rating: 4.8,
-          reviewCount: 124,
-          dayPassPrice: 25,
-          primaryPhoto: 'https://via.placeholder.com/400x300',
-          distance: 0.8,
-          amenities: ['Sauna', 'Pool', 'WiFi'],
-          isVerified: true,
-          isOpen: true,
+      // Call the places-search Edge Function
+      const { data, error: functionError } = await supabase.functions.invoke('places-search', {
+        body: {
+          textQuery: searchQuery,
+          locationBias: {
+            circle: {
+              center: {
+                latitude: location.latitude,
+                longitude: location.longitude,
+              },
+              radius: (filters.distance || 10) * 1609.34, // Convert miles to meters
+            },
+          },
+          includedType: 'gym',
         },
-        // Add more mock results...
-      ];
+      });
 
-      set({ results: mockResults, isLoading: false });
+      if (functionError) {
+        throw new Error(functionError.message || 'Search failed');
+      }
+
+      // Transform Google Places API response to SearchResult format
+      const places = data?.places || [];
+      const results: SearchResult[] = places.map((place: any) => {
+        // Calculate distance from user location
+        const placeLatLng = place.location;
+        const distance = calculateDistance(
+          location.latitude,
+          location.longitude,
+          placeLatLng.latitude,
+          placeLatLng.longitude
+        );
+
+        // Get the first photo reference if available
+        const photoReference = place.photos?.[0]?.name || null;
+        const photoUrl = photoReference
+          ? `https://places.googleapis.com/v1/${photoReference}/media?maxHeightPx=400&key=${process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY}`
+          : 'https://via.placeholder.com/400x300?text=No+Image';
+
+        return {
+          id: place.id,
+          name: place.displayName?.text || 'Unknown Gym',
+          address: place.formattedAddress || '',
+          latitude: placeLatLng.latitude,
+          longitude: placeLatLng.longitude,
+          rating: place.rating || 0,
+          reviewCount: place.userRatingCount || 0,
+          dayPassPrice: 25, // Default - will be fetched from our DB
+          primaryPhoto: photoUrl,
+          distance,
+          amenities: extractAmenities(place),
+          isVerified: false, // From our DB
+          isOpen: isPlaceOpen(place.regularOpeningHours),
+        };
+      });
+
+      // Apply client-side filters
+      let filteredResults = results;
+
+      // Filter by price range
+      if (filters.priceRange) {
+        filteredResults = filteredResults.filter(
+          (r) => r.dayPassPrice >= filters.priceRange!.min && r.dayPassPrice <= filters.priceRange!.max
+        );
+      }
+
+      // Filter by minimum rating
+      if (filters.rating) {
+        filteredResults = filteredResults.filter((r) => r.rating >= filters.rating!);
+      }
+
+      // Filter by open now
+      if (filters.isOpenNow) {
+        filteredResults = filteredResults.filter((r) => r.isOpen);
+      }
+
+      // Sort by distance
+      filteredResults.sort((a, b) => a.distance - b.distance);
+
+      set({ results: filteredResults, isLoading: false });
 
       // Add to recent searches if query exists
       if (query.trim()) {
         get().addRecentSearch(query.trim());
       }
     } catch (error) {
+      console.error('Search error:', error);
       set({
         error: error instanceof Error ? error.message : 'Search failed',
         isLoading: false,
