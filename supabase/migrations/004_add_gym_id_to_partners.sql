@@ -8,8 +8,9 @@
 --   3. Partner portal gym management
 
 -- Add gym_id column to partners table
+-- Note: gyms.id is BIGINT, not UUID
 ALTER TABLE partners
-ADD COLUMN IF NOT EXISTS gym_id UUID REFERENCES gyms(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS gym_id BIGINT REFERENCES gyms(id) ON DELETE SET NULL;
 
 -- Create index for efficient lookups
 CREATE INDEX IF NOT EXISTS partners_gym_id_idx ON partners(gym_id);
