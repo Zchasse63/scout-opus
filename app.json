@@ -22,6 +22,14 @@
         "com.apple.developer.associated-domains": ["applinks:scoutfitness.app"]
       }
     },
+    "android": {
+      "package": "com.scoutfitness.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
@@ -34,8 +42,17 @@
         {
           "calendarPermission": "The app uses your calendar to detect upcoming trips for gym recommendations."
         }
+      ],
+      [
+        "expo-image",
+        {
+          "cachePolicy": "memory-disk"
+        }
       ]
     ],
+    "experiments": {
+      "typedRoutes": true
+    },
     "extra": {
       "eas": {
         "projectId": "scout-fitness-app"
