@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../lib/supabase';
 
 export interface Badge {
   id: string;
@@ -55,6 +56,9 @@ interface GamificationStore {
     avatar?: string;
   }>;
 
+  // Tracked cities (for unique counting)
+  visitedCities: Set<string>;
+
   // Actions
   addPoints: (points: number, reason: string) => void;
   unlockBadge: (badgeId: string) => void;
@@ -65,6 +69,11 @@ interface GamificationStore {
   setLeaderboard: (data: any[]) => void;
   calculateLevel: () => UserLevel;
   getProgressToNextLevel: () => { current: number; required: number; percentage: number };
+
+  // Database sync
+  syncFromDatabase: () => Promise<void>;
+  syncToDatabase: () => Promise<void>;
+  fetchLeaderboard: () => Promise<void>;
 }
 
 // Level definitions
@@ -176,6 +185,7 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
   recentAchievements: [],
   leaderboardRank: null,
   leaderboardData: [],
+  visitedCities: new Set<string>(),
 
   addPoints: (points, reason) => {
     const newTotal = get().totalPoints + points;
@@ -199,6 +209,9 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
       set({ currentLevel: newLevel.level });
       // TODO: Show level up notification
     }
+
+    // Sync to database (debounced in production)
+    get().syncToDatabase();
   },
 
   unlockBadge: (badgeId) => {
@@ -223,6 +236,9 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
     set((state) => ({
       recentAchievements: [achievement, ...state.recentAchievements].slice(0, 10),
     }));
+
+    // Sync to database
+    get().syncToDatabase();
   },
 
   addAchievement: (achievement) => {
@@ -272,9 +288,19 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
   },
 
   incrementCitiesVisited: (city) => {
-    // TODO: Track unique cities
-    const newCount = get().citiesVisited + 1;
-    set({ citiesVisited: newCount });
+    const visitedCities = get().visitedCities;
+
+    // Only count if not already visited
+    if (visitedCities.has(city)) return;
+
+    const newVisitedCities = new Set(visitedCities);
+    newVisitedCities.add(city);
+    const newCount = newVisitedCities.size;
+
+    set({
+      visitedCities: newVisitedCities,
+      citiesVisited: newCount,
+    });
 
     // Check for exploration badges
     if (newCount === 3) {
@@ -282,6 +308,9 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
     } else if (newCount === 10) {
       get().unlockBadge('globetrotter');
     }
+
+    // Sync to database
+    get().syncToDatabase();
   },
 
   setLeaderboard: (data) => {
@@ -313,5 +342,118 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
     const percentage = Math.min(100, (current / required) * 100);
 
     return { current, required, percentage };
+  },
+
+  // Sync stats from database
+  syncFromDatabase: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: stats, error } = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // Ignore "not found" error
+        console.error('Failed to fetch user stats:', error);
+        return;
+      }
+
+      if (stats) {
+        const citiesArray = stats.cities_visited || [];
+        set({
+          totalPoints: stats.total_points || 0,
+          currentStreak: stats.current_streak || 0,
+          longestStreak: stats.longest_streak || 0,
+          gymsVisited: stats.gyms_visited || 0,
+          citiesVisited: citiesArray.length,
+          totalWorkouts: stats.total_workouts || 0,
+          unlockedBadges: stats.unlocked_badges || [],
+          visitedCities: new Set(citiesArray),
+        });
+
+        // Recalculate level
+        const level = get().calculateLevel();
+        set({ currentLevel: level.level });
+      }
+    } catch (error) {
+      console.error('Error syncing from database:', error);
+    }
+  },
+
+  // Sync stats to database
+  syncToDatabase: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const state = get();
+      const citiesArray = Array.from(state.visitedCities);
+
+      const { error } = await supabase
+        .from('user_stats')
+        .upsert({
+          user_id: user.id,
+          total_points: state.totalPoints,
+          current_streak: state.currentStreak,
+          longest_streak: state.longestStreak,
+          gyms_visited: state.gymsVisited,
+          cities_visited: citiesArray,
+          total_workouts: state.totalWorkouts,
+          unlocked_badges: state.unlockedBadges,
+          current_level: state.currentLevel,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id',
+        });
+
+      if (error) {
+        console.error('Failed to sync user stats:', error);
+      }
+    } catch (error) {
+      console.error('Error syncing to database:', error);
+    }
+  },
+
+  // Fetch leaderboard from database
+  fetchLeaderboard: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_stats')
+        .select(`
+          user_id,
+          total_points,
+          users:user_id (
+            first_name,
+            last_name,
+            avatar_url
+          )
+        `)
+        .order('total_points', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Failed to fetch leaderboard:', error);
+        return;
+      }
+
+      if (data) {
+        const leaderboardData = data.map((entry: any, index: number) => ({
+          userId: entry.user_id,
+          username: entry.users?.first_name
+            ? `${entry.users.first_name} ${entry.users.last_name?.charAt(0) || ''}.`
+            : 'Anonymous',
+          points: entry.total_points || 0,
+          rank: index + 1,
+          avatar: entry.users?.avatar_url,
+        }));
+
+        get().setLeaderboard(leaderboardData);
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+    }
   },
 }));

@@ -7,6 +7,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import { Mic, MicOff, X } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -20,6 +21,7 @@ import { colors } from '../../constants/colors';
 import { typography } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
 import { AudioWaveform } from './AudioWaveform';
+import { supabase } from '../../lib/supabase';
 
 interface VoiceRecordingViewProps {
   onTranscript: (transcript: string) => void;
@@ -112,24 +114,58 @@ export const VoiceRecordingView: React.FC<VoiceRecordingViewProps> = ({
 
   const transcribeAudio = async (audioUri: string) => {
     try {
-      // TODO: Implement actual transcription
-      // For now, simulate with a delay
-      setTranscript('Searching...');
+      setTranscript('Processing...');
 
-      // This would call your voice-transcribe Edge Function
-      // const response = await supabase.functions.invoke('voice-transcribe', {
-      //   body: { audioUri }
-      // });
+      // Read the audio file as base64
+      const audioBase64 = await FileSystem.readAsStringAsync(audioUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
-      // Simulated transcript
-      setTimeout(() => {
-        const mockTranscript = 'Find a gym with sauna near me';
-        setTranscript(mockTranscript);
-        onTranscript(mockTranscript);
-      }, 1500);
+      // Call the voice-transcribe Edge Function
+      const { data: transcribeResult, error: transcribeError } = await supabase.functions.invoke(
+        'voice-transcribe',
+        {
+          body: { audioData: audioBase64 },
+        }
+      );
+
+      if (transcribeError) {
+        throw new Error(transcribeError.message || 'Transcription failed');
+      }
+
+      const transcribedText = transcribeResult?.transcript || '';
+
+      if (!transcribedText) {
+        setTranscript('No speech detected. Please try again.');
+        return;
+      }
+
+      setTranscript(transcribedText);
+
+      // Now process the transcript to extract search intent
+      const { data: processResult, error: processError } = await supabase.functions.invoke(
+        'voice-process-query',
+        {
+          body: { transcript: transcribedText },
+        }
+      );
+
+      if (processError) {
+        console.warn('Intent processing failed, using raw transcript:', processError);
+        // Still pass the raw transcript to search
+        onTranscript(transcribedText);
+        return;
+      }
+
+      // Pass the processed intent or raw transcript
+      const searchQuery = processResult?.parsedIntent?.facility_types?.join(' ')
+        || processResult?.parsedIntent?.required_amenities?.join(' ')
+        || transcribedText;
+
+      onTranscript(searchQuery);
     } catch (error) {
       console.error('Transcription error:', error);
-      setTranscript('Failed to transcribe audio');
+      setTranscript('Failed to transcribe. Please try again.');
     }
   };
 
