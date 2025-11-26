@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Search, Ticket, Plane, User } from 'lucide-react-native';
 import { colors } from '../../constants/colors';
 
 export default function TabsLayout() {
@@ -28,28 +28,36 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🔍</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <Search color={color} size={size || 24} />
+          ),
         }}
       />
       <Tabs.Screen
         name="passes"
         options={{
           title: 'Passes',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>🎟️</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <Ticket color={color} size={size || 24} />
+          ),
         }}
       />
       <Tabs.Screen
         name="trips"
         options={{
           title: 'Trips',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>✈️</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <Plane color={color} size={size || 24} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24 }}>👤</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <User color={color} size={size || 24} />
+          ),
         }}
       />
     </Tabs>

@@ -271,13 +271,22 @@ Example:
 - Semantic navigation structure
 - Alternative text for all images
 
-## Next Steps
+## Documentation
 
-1. **Edge Functions**: Deploy all Supabase functions with proper API keys
-2. **Stripe Setup**: Connect Stripe account and add payment processing
-3. **TestFlight**: Build and submit for beta testing
-4. **Refinements**: Gather user feedback and iterate
-5. **App Store**: Final submission and launch
+Detailed documentation is available in the `/docs` folder:
+
+| Document | Description |
+|----------|-------------|
+| [NEXT_STEPS.md](docs/NEXT_STEPS.md) | Current tasks and priorities |
+| [ONBOARDING.md](docs/ONBOARDING.md) | Developer onboarding guide |
+| [AUDIT_REMEDIATION_PLAN.md](docs/AUDIT_REMEDIATION_PLAN.md) | Known issues and fixes |
+| [Phase Documents](docs/) | Detailed phase breakdowns (PHASE_1 through PHASE_8) |
+| [Technical Blueprint](docs/Scout_Fitness_App_Complete_Technical_Blueprint_November_2025-2.md) | Complete specification |
+
+## Repository
+
+- **GitHub**: https://github.com/Zchasse63/scout-opus.git
+- **Supabase Project**: wxepvxrpkaehqkujzzqn
 
 ## Support
 
