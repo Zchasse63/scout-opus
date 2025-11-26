@@ -66,13 +66,12 @@ export function useVoiceSearch(): UseVoiceSearchReturn {
       // Read the audio file as base64
       const audioBase64 = await readFileAsBase64(uri);
 
-      // Send to transcription service via Edge Function
-      const { data, error: transcribeError } = await supabase.functions.invoke(
-        'voice-process-query',
+      // Step 1: Transcribe audio using Whisper via voice-transcribe
+      const { data: transcriptionData, error: transcribeError } = await supabase.functions.invoke(
+        'voice-transcribe',
         {
           body: {
             audioData: audioBase64,
-            mimeType: 'audio/wav',
           },
         }
       );
@@ -81,11 +80,30 @@ export function useVoiceSearch(): UseVoiceSearchReturn {
         throw transcribeError;
       }
 
-      // Extract transcript and intent from response
-      const { transcript: newTranscript, intent: parsedIntent } = data;
+      const transcriptText = transcriptionData?.transcript;
+      if (!transcriptText) {
+        throw new Error('Failed to transcribe audio');
+      }
 
-      setTranscript(newTranscript || 'Could not transcribe audio');
-      setIntent(parsedIntent || null);
+      setTranscript(transcriptText);
+
+      // Step 2: Process transcript to extract search intent via voice-process-query
+      const { data: intentData, error: intentError } = await supabase.functions.invoke(
+        'voice-process-query',
+        {
+          body: {
+            transcript: transcriptText,
+          },
+        }
+      );
+
+      if (intentError) {
+        throw intentError;
+      }
+
+      // Extract parsed intent from response
+      const parsedIntent = intentData?.parsedIntent || null;
+      setIntent(parsedIntent);
       setRecordingState('results');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop recording');

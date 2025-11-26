@@ -27,7 +27,7 @@ export async function createPaymentIntent(
     throw new Error('User not authenticated');
   }
 
-  const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+  const { data, error } = await supabase.functions.invoke('payments-create-intent', {
     body: {
       gymId: input.gymId,
       passType: input.passType,
