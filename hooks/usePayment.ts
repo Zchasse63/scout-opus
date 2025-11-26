@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStripe } from '@stripe/stripe-react-native';
 import { createPaymentIntent, confirmPaymentAndCreateBooking } from '../services/payment';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 
 interface PaymentInput {
   gymId: string;
@@ -20,6 +21,39 @@ export function usePayment() {
   const { presentPaymentSheet, initPaymentSheet } = useStripe();
   const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [customerName, setCustomerName] = useState<string>('Customer');
+  const [customerEmail, setCustomerEmail] = useState<string | undefined>();
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('users')
+          .select('first_name, last_name, email')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          const fullName = [profile.first_name, profile.last_name]
+            .filter(Boolean)
+            .join(' ') || 'Customer';
+          setCustomerName(fullName);
+          setCustomerEmail(profile.email || user.email);
+        } else {
+          // Fallback to auth email
+          setCustomerEmail(user.email);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const processPayment = async (input: PaymentInput): Promise<PaymentResult> => {
     setIsProcessing(true);
@@ -33,7 +67,8 @@ export function usePayment() {
         merchantDisplayName: 'Scout',
         paymentIntentClientSecret: clientSecret,
         defaultBillingDetails: {
-          name: 'Customer', // TODO: Pull from user profile
+          name: customerName,
+          email: customerEmail,
         },
         allowsDelayedPaymentMethods: false,
       });

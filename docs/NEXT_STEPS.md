@@ -76,95 +76,79 @@ npm run dev
 
 ## 🎯 PHASE 2: CORE FEATURES (Next Priority - Weeks 4-7)
 
-### 1. Search API (Highest Impact)
-**File:** `/stores/searchStore.ts:162`
-**Task:** Replace mock search with real Supabase spatial query
-```typescript
-// Create RPC function in Supabase:
-// search_gyms_spatial(lat, lng, radius_km, filters)
-// Use PostGIS ST_DWithin for radius search
-```
+### 1. ✅ Search API (COMPLETED)
+**File:** `/stores/searchStore.ts`
+**Status:** Implemented real search using places-search Edge Function
+- Calls Google Places API via Edge Function
+- Calculates distance from user location
+- Applies client-side filters (price, rating, open status)
+- Sorts results by distance
 
-### 2. Payment Intent Creation
-**File:** `/supabase/functions/payments-create-intent/index.ts:31-34`
-**Task:** Implement Stripe PaymentIntent
-```typescript
-// 1. Get partner's stripe_account_id from partners table
-// 2. Create PaymentIntent with 15% platform fee
-// 3. Return client_secret
-```
+### 2. ✅ Payment Intent Creation (COMPLETED)
+**File:** `/supabase/functions/payments-create-intent/index.ts`
+**Status:** Full Stripe Connect implementation
+- Creates booking with pending status
+- Fetches partner's Stripe account from database
+- Creates PaymentIntent with 15% platform fee
+- Uses application_fee_amount and transfer_data
 
-### 3. QR Validation
-**File:** `/supabase/functions/bookings-validate-qr/index.ts:23`
-**Task:** Implement QR code verification
-```typescript
-// 1. Parse QR data (booking_id, signature)
-// 2. Verify booking exists and status is 'confirmed'
-// 3. Update status to 'used'
-// 4. Record check-in timestamp
-```
+### 3. ✅ QR Validation (COMPLETED)
+**File:** `/supabase/functions/bookings-validate-qr/index.ts`
+**Status:** Full validation implementation
+- Verifies booking exists and is confirmed
+- Checks booking date matches today
+- Updates status to 'used' on successful check-in
+- Records check-in timestamp
 
-### 4. UGC Photo Upload
-**File:** `/components/ugc/SubmitPhoto.tsx:101`
-**Task:** Connect to Supabase Storage
-```typescript
-// 1. Upload image to 'gym-photos' bucket
-// 2. Create gym_photos record
-// 3. Create gym_verification_queue entry
-// 4. Award gamification points
-```
+### 4. ✅ UGC Photo Upload (COMPLETED)
+**File:** `/components/ugc/SubmitPhoto.tsx`
+**Status:** Connected to Supabase Storage
+- Uploads to 'gym-photos' bucket
+- Creates gym_photos records
+- Awards gamification points
 
-### 5. UGC Review Submission
-**File:** `/components/ugc/SubmitReview.tsx:46`
-**Task:** Save review to database
-```typescript
-// 1. Verify user has booking for gym
-// 2. Insert into gym_reviews table
-// 3. Award gamification points
-// 4. Show success message
-```
+### 5. ✅ UGC Review Submission (COMPLETED)
+**File:** `/components/ugc/SubmitReview.tsx`
+**Status:** Connected to database
+- Inserts into gym_reviews table
+- Checks for verified bookings
+- Awards gamification points
+- Triggers rating recalculation
 
-### 6. Trip Creation API
-**File:** `/components/trips/AddTripButton.tsx:109`
-**Task:** Insert trip to database
-```typescript
-// Insert into travel_periods table
-// Set source as 'manual'
-```
+### 6. ✅ Trip Creation API (COMPLETED)
+**File:** `/components/trips/AddTripButton.tsx`
+**Status:** Inserts into travel_periods table
+- Sets source as 'manual'
+- Proper validation and error handling
 
-### 7. QR Code Modal
-**File:** `/app/(tabs)/passes.tsx:75`
-**Task:** Generate and display QR
-```typescript
-// Generate QR with: booking_id, user_id, signature
-// Display with react-native-qrcode-svg
-```
+### 7. ✅ QR Code Modal (COMPLETED)
+**File:** `/app/(tabs)/passes.tsx`
+**Status:** Full modal implementation
+- Uses QRPass component
+- Generates QR payload with booking info
+- Shows gym name, pass type, date, status
 
-### 8. Gamification DB Sync
-**File:** `/stores/gamificationStore.ts:200,240,275`
-**Task:** Sync points to database
-```typescript
-// Sync user_stats table
-// Check streaks from database
-// Track cities_visited array
-```
+### 8. ✅ Gamification DB Sync (COMPLETED)
+**File:** `/stores/gamificationStore.ts`
+**Status:** Full sync implementation
+- syncFromDatabase() loads user stats on app start
+- syncToDatabase() persists changes
+- fetchLeaderboard() gets rankings
+- Tracks unique cities
 
-### 9. Voice Transcription
-**File:** `/components/voice/VoiceRecordingView.tsx:115`
-**Task:** Connect to Edge Function
-```typescript
-// Send audio to voice-transcribe function
-// Parse transcription response
-// Populate search with intent
-```
+### 9. ✅ Voice Transcription (COMPLETED)
+**File:** `/components/voice/VoiceRecordingView.tsx`
+**Status:** Connected to Edge Functions
+- Sends audio to voice-transcribe (Whisper)
+- Processes with voice-process-query (Gemini)
+- Extracts search query from parsed intent
 
-### 10. Customer Name in Payment
-**File:** `/hooks/usePayment.ts:36`
-**Task:** Query user profile
-```typescript
-// Get first_name, last_name from users table
-// Pass to Stripe PaymentIntent
-```
+### 10. ✅ Customer Name in Payment (COMPLETED)
+**File:** `/hooks/usePayment.ts`
+**Status:** Fetches user profile on mount
+- Gets first_name, last_name from users table
+- Falls back to auth email if profile not found
+- Passes to Stripe PaymentSheet billing details
 
 ---
 
