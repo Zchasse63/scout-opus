@@ -6,6 +6,14 @@ import { useAuthStore } from './stores/authStore';
 import { supabase } from './lib/supabase';
 import { StripeProvider } from './components/providers/StripeProvider';
 import { registerPushToken } from './services/notifications';
+import { initSentry, setUser, clearUser, SentryErrorBoundary } from './lib/sentry';
+import { initAnalytics, identifyUser, resetUser, trackAppOpen } from './lib/analytics';
+
+// Initialize Sentry as early as possible
+initSentry();
+
+// Initialize analytics
+initAnalytics();
 
 // Create a client
 const queryClient = new QueryClient({
@@ -29,11 +37,26 @@ export default function App() {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         refreshSession();
 
+        // Set user context for Sentry and analytics
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email,
+          });
+          identifyUser(session.user.id, {
+            email: session.user.email,
+          });
+        }
+
         // Register for push notifications when user signs in
         registerPushToken().catch((error) => {
           console.error('Failed to register push token:', error);
           // Don't throw - push notifications are optional
         });
+      } else if (event === 'SIGNED_OUT') {
+        // Clear user context for Sentry and analytics
+        clearUser();
+        resetUser();
       }
     });
 
@@ -43,12 +66,20 @@ export default function App() {
   }, [refreshSession]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <StripeProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <Slot />
+    <SentryErrorBoundary
+      fallback={({ error }) => (
+        <GestureHandlerRootView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <></>
         </GestureHandlerRootView>
-      </StripeProvider>
-    </QueryClientProvider>
+      )}
+    >
+      <QueryClientProvider client={queryClient}>
+        <StripeProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <Slot />
+          </GestureHandlerRootView>
+        </StripeProvider>
+      </QueryClientProvider>
+    </SentryErrorBoundary>
   );
 }
