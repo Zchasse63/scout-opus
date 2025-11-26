@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.9.0"
+    "version": ">= 14.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -9,6 +10,9 @@
       "ios": {
         "resourceClass": "m-medium",
         "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "development"
       }
     },
     "preview": {
@@ -17,21 +21,38 @@
         "resourceClass": "m-medium",
         "simulator": false,
         "bundleIdentifier": "com.scoutfitness.app"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "preview"
       }
     },
     "production": {
+      "distribution": "store",
       "ios": {
         "resourceClass": "m-medium",
         "bundleIdentifier": "com.scoutfitness.app"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "production"
       }
     }
   },
   "submit": {
     "production": {
       "ios": {
-        "appleId": "your-apple-id@example.com",
+        "appleId": "appstore@scoutfitness.app",
         "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
         "appleTeamId": "YOUR_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
       }
     }
   }
