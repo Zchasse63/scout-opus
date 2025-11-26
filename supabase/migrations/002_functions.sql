@@ -88,8 +88,8 @@ $$ LANGUAGE plpgsql STABLE;
 
 -- Function to validate QR code
 CREATE OR REPLACE FUNCTION validate_qr_code(
-  booking_id BIGINT,
-  current_date DATE
+  p_booking_id BIGINT,
+  p_check_date DATE
 )
 RETURNS TABLE (
   is_valid BOOLEAN,
@@ -104,19 +104,19 @@ BEGIN
   FROM bookings b
   JOIN users u ON b.user_id = u.id
   JOIN gyms g ON b.gym_id = g.id
-  WHERE b.id = booking_id;
+  WHERE b.id = p_booking_id;
 
   -- Validate conditions
   IF booking_record IS NULL THEN
-    RETURN QUERY SELECT FALSE, 'Booking not found', NULL, NULL;
+    RETURN QUERY SELECT FALSE, 'Booking not found', NULL::TEXT, NULL::TEXT;
   ELSIF booking_record.status = 'used' THEN
-    RETURN QUERY SELECT FALSE, 'Pass already used', NULL, NULL;
+    RETURN QUERY SELECT FALSE, 'Pass already used', NULL::TEXT, NULL::TEXT;
   ELSIF booking_record.status = 'cancelled' THEN
-    RETURN QUERY SELECT FALSE, 'Booking cancelled', NULL, NULL;
-  ELSIF booking_record.booking_date != current_date THEN
-    RETURN QUERY SELECT FALSE, 'Invalid date for this pass', NULL, NULL;
+    RETURN QUERY SELECT FALSE, 'Booking cancelled', NULL::TEXT, NULL::TEXT;
+  ELSIF booking_record.booking_date != p_check_date THEN
+    RETURN QUERY SELECT FALSE, 'Invalid date for this pass', NULL::TEXT, NULL::TEXT;
   ELSE
-    RETURN QUERY SELECT TRUE, 'Valid pass', booking_record.email, booking_record.name;
+    RETURN QUERY SELECT TRUE, 'Valid pass', booking_record.email::TEXT, booking_record.name::TEXT;
   END IF;
 END;
 $$ LANGUAGE plpgsql STABLE;
