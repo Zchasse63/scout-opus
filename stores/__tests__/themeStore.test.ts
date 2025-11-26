@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-native';
 import { useThemeStore } from '../themeStore';
 
 describe('themeStore', () => {
@@ -43,19 +43,19 @@ describe('themeStore', () => {
     // Start at system
     expect(result.current.mode).toBe('system');
 
-    // Toggle to light
-    act(() => {
-      result.current.toggleTheme();
-    });
-    expect(result.current.mode).toBe('light');
-
-    // Toggle to dark
+    // Toggle to dark (system -> dark)
     act(() => {
       result.current.toggleTheme();
     });
     expect(result.current.mode).toBe('dark');
 
-    // Toggle back to system
+    // Toggle to light (dark -> light)
+    act(() => {
+      result.current.toggleTheme();
+    });
+    expect(result.current.mode).toBe('light');
+
+    // Toggle back to system (light -> system)
     act(() => {
       result.current.toggleTheme();
     });

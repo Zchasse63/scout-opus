@@ -1,5 +1,37 @@
 // Jest setup file
-import '@testing-library/jest-native/extend-expect';
+// Note: @testing-library/jest-native is deprecated, using built-in matchers from @testing-library/react-native
+
+// Mock Expo winter runtime (SDK 54+)
+jest.mock('expo/src/winter/runtime.native', () => ({}), { virtual: true });
+jest.mock('expo/src/winter/installGlobal', () => ({}), { virtual: true });
+
+// Mock Expo constants
+jest.mock('expo-constants', () => ({
+  expoConfig: {
+    version: '1.0.0',
+    extra: { eas: { buildProfile: 'test' } },
+  },
+}));
+
+// Mock Sentry
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  captureException: jest.fn(),
+  setUser: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  ErrorBoundary: ({ children }) => children,
+}));
+
+// Mock Mixpanel
+jest.mock('mixpanel-react-native', () => ({
+  Mixpanel: jest.fn().mockImplementation(() => ({
+    init: jest.fn(() => Promise.resolve()),
+    identify: jest.fn(),
+    reset: jest.fn(),
+    track: jest.fn(),
+    getPeople: jest.fn(() => ({ set: jest.fn() })),
+  })),
+}));
 
 // Mock Supabase
 jest.mock('./lib/supabase', () => ({

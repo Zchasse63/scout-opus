@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react-hooks';
+import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useCalendarSync } from '../useCalendarSync';
 import * as Calendar from 'expo-calendar';
 

@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-native';
 import { useSearchStore } from '../searchStore';
 
 describe('searchStore', () => {
@@ -81,7 +81,7 @@ describe('searchStore', () => {
     const { result } = renderHook(() => useSearchStore());
 
     act(() => {
-      result.current.setSelectedGym('gym-123');
+      result.current.setSelectedGymId('gym-123');
     });
 
     expect(result.current.selectedGymId).toBe('gym-123');
@@ -91,8 +91,8 @@ describe('searchStore', () => {
     const { result } = renderHook(() => useSearchStore());
 
     act(() => {
-      result.current.setSelectedGym('gym-123');
-      result.current.clearSelectedGym();
+      result.current.setSelectedGymId('gym-123');
+      result.current.setSelectedGymId(null);
     });
 
     expect(result.current.selectedGymId).toBe(null);
@@ -139,7 +139,7 @@ describe('searchStore', () => {
 
     act(() => {
       result.current.setQuery('test query');
-      result.current.setSelectedGym('gym-123');
+      result.current.setSelectedGymId('gym-123');
       result.current.clearSearch();
     });
 
