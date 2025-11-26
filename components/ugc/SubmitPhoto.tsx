@@ -9,11 +9,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { Camera, X } from 'lucide-react-native';
+import { decode } from 'base64-arraybuffer';
 import { colors } from '../../constants/colors';
 import { typography } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
 import { Button } from '../ui/Button';
+import { supabase } from '../../lib/supabase';
+import { useGamificationStore } from '../../stores/gamificationStore';
 
 interface SubmitPhotoProps {
   gymId: string;
@@ -98,22 +102,87 @@ export const SubmitPhoto: React.FC<SubmitPhotoProps> = ({
     setIsUploading(true);
 
     try {
-      // TODO: Upload images to Supabase Storage
-      // For each image:
-      // 1. Upload to storage bucket
-      // 2. Create record in gym_photos table with moderation status 'pending'
-      // 3. Award points to user for contribution
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Error', 'Please sign in to upload photos.');
+        return;
+      }
 
-      // Simulate upload
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const uploadedUrls: string[] = [];
+      const pointsPerPhoto = 20;
+
+      for (const imageUri of selectedImages) {
+        // Read the file as base64
+        const base64 = await FileSystem.readAsStringAsync(imageUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        // Generate unique filename
+        const fileExt = imageUri.split('.').pop() || 'jpg';
+        const fileName = `${gymId}/${user.id}/${Date.now()}.${fileExt}`;
+
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('gym-photos')
+          .upload(fileName, decode(base64), {
+            contentType: `image/${fileExt}`,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('gym-photos')
+          .getPublicUrl(fileName);
+
+        uploadedUrls.push(publicUrl);
+
+        // Create record in gym_photos table
+        const { error: insertError } = await supabase
+          .from('gym_photos')
+          .insert({
+            gym_id: gymId,
+            user_id: user.id,
+            photo_url: publicUrl,
+            storage_path: fileName,
+            moderation_status: 'pending',
+          });
+
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          // Continue with other photos even if one fails
+        }
+      }
+
+      // Award gamification points
+      const totalPoints = selectedImages.length * pointsPerPhoto;
+      const { addPoints } = useGamificationStore.getState();
+      addPoints(totalPoints, 'photo_upload');
+
+      // Update user stats
+      await supabase
+        .from('user_stats')
+        .upsert({
+          user_id: user.id,
+          photos_submitted: selectedImages.length,
+        }, {
+          onConflict: 'user_id',
+        });
 
       Alert.alert(
         'Success',
-        'Your photos have been submitted for review. You earned 20 points!',
+        `Your ${selectedImages.length} photo${selectedImages.length > 1 ? 's have' : ' has'} been submitted for review. You earned ${totalPoints} points!`,
         [{ text: 'OK', onPress: () => setSelectedImages([]) }]
       );
 
-      onPhotoSubmitted?.(selectedImages[0]);
+      if (uploadedUrls.length > 0) {
+        onPhotoSubmitted?.(uploadedUrls[0]);
+      }
     } catch (error) {
       console.error('Error uploading photos:', error);
       Alert.alert('Error', 'Failed to upload photos. Please try again.');

@@ -61,12 +61,17 @@ export interface Booking {
   id: string;
   userId: string;
   gymId: string;
+  gymName?: string;
   bookingDate: string;
   passType: 'day' | 'week' | 'month';
-  status: 'confirmed' | 'used' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'used' | 'cancelled' | 'expired';
   amountPaid: number;
+  platformFee?: number;
+  gymPayout?: number;
+  stripePaymentIntentId?: string;
   qrCode?: string;
   qrScannedAt?: string;
+  checkedInAt?: string;
 }
 
 // Trip Types

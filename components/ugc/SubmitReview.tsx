@@ -12,6 +12,8 @@ import { colors } from '../../constants/colors';
 import { typography } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
 import { Button } from '../ui/Button';
+import { supabase } from '../../lib/supabase';
+import { useGamificationStore } from '../../stores/gamificationStore';
 
 interface SubmitReviewProps {
   gymId: string;
@@ -43,18 +45,62 @@ export const SubmitReview: React.FC<SubmitReviewProps> = ({
     setIsSubmitting(true);
 
     try {
-      // TODO: Submit review to Supabase
-      // 1. Create record in gym_reviews table
-      // 2. Set moderation_status to 'pending'
-      // 3. Award points to user
-      // 4. Update gym's average rating
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Error', 'Please sign in to submit a review.');
+        return;
+      }
 
-      // Simulate submission
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Check if user has a booking for this gym (optional verification)
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('gym_id', gymId)
+        .eq('status', 'used')
+        .limit(1)
+        .single();
+
+      // Insert review into gym_reviews table
+      const { error: insertError } = await supabase
+        .from('gym_reviews')
+        .insert({
+          gym_id: gymId,
+          user_id: user.id,
+          rating,
+          review_text: reviewText.trim(),
+          moderation_status: 'pending',
+          has_verified_booking: !!booking,
+        });
+
+      if (insertError) {
+        // Check for duplicate review
+        if (insertError.code === '23505') {
+          Alert.alert('Already Reviewed', 'You have already submitted a review for this gym.');
+          return;
+        }
+        throw insertError;
+      }
+
+      // Award gamification points
+      const pointsEarned = 20;
+      const { addPoints } = useGamificationStore.getState();
+      addPoints(pointsEarned, 'review_submitted');
+
+      // Update user stats
+      await supabase.rpc('increment_user_stat', {
+        p_user_id: user.id,
+        p_stat_name: 'reviews_submitted',
+        p_increment: 1,
+      });
+
+      // Trigger gym rating recalculation (via database trigger or RPC)
+      await supabase.rpc('update_gym_rating', { p_gym_id: gymId });
 
       Alert.alert(
         'Success',
-        'Your review has been submitted! You earned 20 points.',
+        `Your review has been submitted! You earned ${pointsEarned} points.`,
         [
           {
             text: 'OK',

@@ -8,12 +8,16 @@ import {
   TouchableOpacity,
   SectionList,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
+import { X } from 'lucide-react-native';
 import { colors } from '../../constants/colors';
 import { padding, spacing, radius } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
 import { Booking } from '../../types';
 import { useBookings } from '../../hooks/useBookings';
+import { QRPass } from '../../components/booking/QRPass';
 
 interface BookingSection {
   title: string;
@@ -23,6 +27,8 @@ interface BookingSection {
 export default function PassesTab() {
   const { data: bookings, isLoading, error } = useBookings();
   const today = new Date().toISOString().split('T')[0];
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [qrModalVisible, setQrModalVisible] = useState(false);
 
   // Show loading state
   if (isLoading) {
@@ -72,14 +78,35 @@ export default function PassesTab() {
   ].filter((s) => s.data.length > 0);
 
   const handleShowQR = useCallback((booking: Booking) => {
-    // TODO: Show QR code modal
-    console.log('Show QR code for:', booking.id);
+    setSelectedBooking(booking);
+    setQrModalVisible(true);
+  }, []);
+
+  const handleCloseQR = useCallback(() => {
+    setQrModalVisible(false);
+    setSelectedBooking(null);
   }, []);
 
   const handleAddToWallet = useCallback((booking: Booking) => {
-    // TODO: Add to Apple Wallet
+    // TODO: Implement Apple Wallet integration
+    // This requires PassKit and a server-side pass generation
     console.log('Add to wallet:', booking.id);
   }, []);
+
+  // Generate QR code data for a booking
+  const generateQRData = (booking: Booking): string => {
+    // Create a JSON payload with booking info
+    const qrPayload = {
+      bookingId: booking.id,
+      userId: booking.userId,
+      gymId: booking.gymId,
+      date: booking.bookingDate,
+      type: booking.passType,
+      // Add a simple signature (in production, use HMAC)
+      sig: btoa(`${booking.id}:${booking.bookingDate}`).slice(0, 16),
+    };
+    return JSON.stringify(qrPayload);
+  };
 
   const renderBookingCard = ({ item: booking }: { item: Booking }) => (
     <BookingCard
@@ -119,6 +146,37 @@ export default function PassesTab() {
       ) : (
         renderEmpty()
       )}
+
+      {/* QR Code Modal */}
+      <Modal
+        visible={qrModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCloseQR}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Your Pass</Text>
+            <Pressable onPress={handleCloseQR} style={styles.closeButton}>
+              <X color={colors.gray500} size={24} />
+            </Pressable>
+          </View>
+
+          {selectedBooking && (
+            <View style={styles.qrContent}>
+              <QRPass
+                bookingId={selectedBooking.id}
+                gymName={selectedBooking.gymName || 'Gym'}
+                passType={selectedBooking.passType}
+                bookingDate={selectedBooking.bookingDate}
+                qrCodeData={generateQRData(selectedBooking)}
+                status={selectedBooking.status as 'confirmed' | 'used' | 'cancelled'}
+                onAddToWallet={() => handleAddToWallet(selectedBooking)}
+              />
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -347,5 +405,31 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.gray600,
     textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.gray50,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: padding.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
+  modalTitle: {
+    ...typography.h2,
+    color: colors.black,
+  },
+  closeButton: {
+    padding: spacing.sm,
+  },
+  qrContent: {
+    flex: 1,
+    padding: padding.lg,
+    justifyContent: 'center',
   },
 });

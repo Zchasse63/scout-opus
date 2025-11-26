@@ -20,6 +20,7 @@ import { colors } from '../../constants/colors';
 import { typography } from '../../constants/typography';
 import { spacing } from '../../constants/spacing';
 import { Button } from '../ui/Button';
+import { supabase } from '../../lib/supabase';
 
 interface AddTripButtonProps {
   onTripCreated?: (trip: TripData) => void;
@@ -100,18 +101,39 @@ export const AddTripButton: React.FC<AddTripButtonProps> = ({ onTripCreated }) =
 
     setIsLoading(true);
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Error', 'Please sign in to create a trip.');
+        return;
+      }
+
       const tripData: TripData = {
         destination: destination.trim(),
         startDate,
         endDate,
       };
 
-      // TODO: Call API to create trip
-      // For now, just simulate delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Insert trip into travel_periods table
+      const { data: trip, error: insertError } = await supabase
+        .from('travel_periods')
+        .insert({
+          user_id: user.id,
+          destination: tripData.destination,
+          start_date: tripData.startDate,
+          end_date: tripData.endDate,
+          source: 'manual', // User manually created this trip
+          status: 'upcoming',
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
 
       onTripCreated?.(tripData);
-      Alert.alert('Success', 'Trip created successfully!');
+      Alert.alert('Success', 'Trip created successfully! Now search for gyms at your destination.');
       handleClose();
     } catch (error) {
       console.error('Error creating trip:', error);
