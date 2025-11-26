@@ -26,6 +26,10 @@ interface ButtonProps {
   textStyle?: TextStyle;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
+  // Accessibility props
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  testID?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -40,6 +44,9 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   icon,
   iconPosition = 'left',
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
 }) => {
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
@@ -199,6 +206,15 @@ export const Button: React.FC<ButtonProps> = ({
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{
+        disabled: disabled || loading,
+        busy: loading,
+      }}
+      testID={testID}
     >
       {renderContent()}
     </TouchableOpacity>
