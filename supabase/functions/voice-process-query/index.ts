@@ -1,23 +1,31 @@
 import { serve } from "https://deno.land/std@0.132.0/http/server.ts";
+import { requireAuth } from "../_shared/auth.ts";
+import { validateRequest, schemas } from "../_shared/validation.ts";
+import { checkRateLimit, RATE_LIMITS, rateLimitResponse, rateLimitHeaders, getIdentifier } from "../_shared/rateLimit.ts";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
-interface VoiceProcessRequest {
-  transcript: string;
-  userLocation?: { latitude: number; longitude: number };
-  conversationHistory?: Array<{ role: string; content: string }>;
-}
+const INTENT_PROMPT = `You are Scout's voice search assistant for finding gyms and fitness facilities.
 
-const INTENT_PROMPT = `You are Scout's voice search assistant. Parse this fitness facility search query and extract structured parameters.
+TASK: Parse the user's query and extract structured search parameters. Consider the full conversation context.
+
+REFINEMENT RULES:
+- If user says "only ones with [amenity]" or "just show [filter]", ADD to existing filters
+- If user says "cheaper" or "under $X", ADD price constraint
+- If user says "closer" or "nearer", keep existing filters but prioritize distance
+- If user says "forget that" or "start over", CLEAR previous context
+- If user asks "which is cheapest/closest/best rated", set intent to "compare" with sort criteria
 
 Extract as JSON:
 {
-  "intent": "search_gyms" | "get_details" | "book_pass" | "check_schedule",
+  "intent": "search_gyms" | "refine_search" | "compare" | "get_details" | "book_pass",
   "location": { "query": string, "use_current": boolean },
   "facility_types": string[],
   "required_amenities": string[],
   "time_constraint": string | null,
   "price_constraint": { "max": number } | null,
+  "sort_by": "distance" | "price" | "rating" | null,
+  "is_refinement": boolean,
   "confidence": 0.0-1.0
 }
 
@@ -28,14 +36,35 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  try {
-    const { transcript, userLocation, conversationHistory } = await req.json() as VoiceProcessRequest;
+  // Validate JWT authentication
+  const authResult = await requireAuth(req);
+  if (authResult instanceof Response) return authResult;
 
-    if (!transcript) {
+  // Rate limit check (AI endpoint - stricter limits)
+  const rateLimitResult = checkRateLimit(
+    getIdentifier(req, authResult.id),
+    RATE_LIMITS.AI
+  );
+  if (!rateLimitResult.allowed) {
+    return rateLimitResponse(rateLimitResult);
+  }
+
+  try {
+    // Validate request body with Zod schema
+    const validation = await validateRequest(req, schemas.voiceProcess);
+    if (!validation.success) {
       return new Response(
-        JSON.stringify({ error: "transcript is required" }),
+        JSON.stringify({ error: validation.error }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
+    }
+    const { transcript, userLocation, conversationHistory, previousIntent } = validation.data;
+
+    // Build context string for follow-up queries
+    let contextString = "";
+    if (previousIntent && Object.keys(previousIntent).length > 0) {
+      contextString = `\n\nPREVIOUS SEARCH CONTEXT (merge refinements with this):
+${JSON.stringify(previousIntent, null, 2)}`;
     }
 
     // Build request to Gemini API
@@ -43,7 +72,7 @@ serve(async (req) => {
       ...(conversationHistory || []),
       {
         role: "user",
-        content: `${INTENT_PROMPT}\n\nUser query: "${transcript}"\nUser location: ${
+        content: `${INTENT_PROMPT}${contextString}\n\nUser query: "${transcript}"\nUser location: ${
           userLocation ? JSON.stringify(userLocation) : "unknown"
         }`,
       },

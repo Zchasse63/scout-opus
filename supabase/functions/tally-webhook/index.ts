@@ -1,11 +1,70 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { encode as hexEncode } from 'https://deno.land/std@0.168.0/encoding/hex.ts';
+
+const TALLY_SIGNING_SECRET = Deno.env.get('TALLY_SIGNING_SECRET');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
+    'authorization, x-client-info, apikey, content-type, tally-signature',
 };
+
+/**
+ * Verify Tally webhook signature using HMAC-SHA256
+ * @see https://tally.so/help/webhooks#webhook-signature
+ */
+async function verifyTallySignature(
+  payload: string,
+  signature: string | null
+): Promise<boolean> {
+  if (!TALLY_SIGNING_SECRET) {
+    console.warn('TALLY_SIGNING_SECRET not configured - skipping signature verification');
+    return true; // Allow in development, but log warning
+  }
+
+  if (!signature) {
+    console.error('Missing Tally signature header');
+    return false;
+  }
+
+  try {
+    // Create HMAC-SHA256 hash
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(TALLY_SIGNING_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const signatureBytes = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      encoder.encode(payload)
+    );
+
+    const expectedSignature = new TextDecoder().decode(
+      hexEncode(new Uint8Array(signatureBytes))
+    );
+
+    // Constant-time comparison to prevent timing attacks
+    if (signature.length !== expectedSignature.length) {
+      return false;
+    }
+
+    let result = 0;
+    for (let i = 0; i < signature.length; i++) {
+      result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+    }
+
+    return result === 0;
+  } catch (error) {
+    console.error('Signature verification error:', error);
+    return false;
+  }
+}
 
 /**
  * Tally Webhook Handler
@@ -17,10 +76,28 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  try {
-    const payload = await req.json();
+  // Get raw body for signature verification
+  const rawBody = await req.text();
 
-    console.log('Tally webhook received:', payload);
+  // Verify webhook signature
+  const tallySignature = req.headers.get('tally-signature');
+  const isValid = await verifyTallySignature(rawBody, tallySignature);
+
+  if (!isValid) {
+    console.error('Invalid Tally webhook signature');
+    return new Response(
+      JSON.stringify({ error: 'Invalid signature' }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      }
+    );
+  }
+
+  try {
+    const payload = JSON.parse(rawBody);
+
+    console.log('Tally webhook received (verified):', payload.eventType);
 
     // Extract form data from Tally webhook
     const { eventType, data } = payload;

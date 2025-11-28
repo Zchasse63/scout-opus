@@ -87,8 +87,8 @@ export const useCalendarSync = () => {
           title: event.title,
           startDate: new Date(event.startDate),
           endDate: new Date(event.endDate),
-          location: event.location,
-          notes: event.notes,
+          location: event.location ?? undefined,
+          notes: event.notes ?? '',
         }));
 
         setUpcomingEvents(formattedEvents);

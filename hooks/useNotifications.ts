@@ -24,6 +24,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -125,7 +127,7 @@ export const useNotifications = () => {
           data: { ...notificationData.data, type: notificationData.type },
           sound: true,
         },
-        trigger: triggerDate,
+        trigger: { type: 'date', date: triggerDate } as any,
       });
 
       return notificationId;
@@ -237,8 +239,8 @@ export const useNotifications = () => {
     );
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationListener);
-      Notifications.removeNotificationSubscription(responseListener);
+      notificationListener.remove();
+      responseListener.remove();
     };
   }, []);
 

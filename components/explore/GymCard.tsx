@@ -4,19 +4,32 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
   Pressable,
+  Dimensions,
 } from 'react-native';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { Heart, Star, MapPin, Dumbbell, BadgeCheck, TrendingUp, Sparkles } from 'lucide-react-native';
 import { colors } from '../../constants/colors';
 import { spacing, padding, radius } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
+import { iconSizes } from '../../constants/icons';
+import { haptics } from '../../utils/haptics';
+import { PhotoCarousel } from './PhotoCarousel';
+import { VerifiedBadge, PopularBadge, NewBadge } from '../ui/TrustBadges';
 import type { Gym } from '../../types';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_WIDTH = SCREEN_WIDTH - padding.screenHorizontal * 2;
 
 interface GymCardProps {
   gym: Gym;
   onPress: (gymId: string) => void;
   onSaveToggle?: (gymId: string) => void;
   isSaved?: boolean;
+  isVerified?: boolean;
+  isPopular?: boolean;
+  isNew?: boolean;
+  viewingCount?: number;
 }
 
 export default function GymCard({
@@ -24,77 +37,122 @@ export default function GymCard({
   onPress,
   onSaveToggle,
   isSaved,
+  isVerified = false,
+  isPopular = false,
+  isNew = false,
+  viewingCount,
 }: GymCardProps) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: withSpring(1) }],
+  }));
+
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.container,
-        pressed && styles.pressed,
-      ]}
-      onPress={() => onPress(gym.id.toString())}
-    >
-      {/* Hero Image */}
-      <View style={styles.imageContainer}>
-        {gym.photos && gym.photos.length > 0 ? (
-          <Image
-            source={{ uri: gym.photos[0] }}
-            style={styles.image}
-          />
-        ) : (
-          <View style={[styles.image, styles.placeholderImage]}>
-            <Text style={styles.placeholderText}>🏋️</Text>
-          </View>
-        )}
-        {/* Gradient Overlay */}
-        <View style={styles.overlay} />
-
-        {/* Save Button */}
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={() => onSaveToggle?.(gym.id.toString())}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.saveIcon}>{isSaved ? '❤️' : '🤍'}</Text>
-        </TouchableOpacity>
-
-        {/* Price Tag */}
-        <View style={styles.priceTag}>
-          <Text style={styles.priceText}>${gym.dayPassPrice}</Text>
-        </View>
-      </View>
-
-      {/* Info Section */}
-      <View style={styles.infoSection}>
-        <View style={styles.header}>
-          <View style={styles.titleSection}>
-            <Text style={styles.name} numberOfLines={2}>
-              {gym.name}
-            </Text>
-            <View style={styles.ratingRow}>
-              <Text style={styles.rating}>⭐ {gym.rating.toFixed(1)}</Text>
-              <Text style={styles.reviewCount}>({gym.reviewCount})</Text>
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        style={({ pressed }) => [
+          styles.container,
+          pressed && styles.pressed,
+        ]}
+        onPress={() => {
+          haptics.selection();
+          onPress(gym.id.toString());
+        }}
+      >
+        {/* Photo Carousel */}
+        <View style={styles.imageContainer}>
+          {gym.photos && gym.photos.length > 0 ? (
+            <PhotoCarousel
+              photos={gym.photos}
+              height={200}
+              width={CARD_WIDTH}
+              borderRadius={0}
+              showPagination={gym.photos.length > 1}
+            />
+          ) : (
+            <View style={[styles.placeholderImage, { height: 200 }]}>
+              <Dumbbell size={iconSizes.xxl} color={colors.gray400} strokeWidth={1.5} />
             </View>
-          </View>
-        </View>
+          )}
 
-        {/* Amenities */}
-        <View style={styles.amenitiesRow}>
-          {gym.amenities.slice(0, 4).map((amenity, index) => (
-            <Text key={index} style={styles.amenityIcon}>
-              {amenity}
-            </Text>
-          ))}
-          {gym.amenities.length > 4 && (
-            <Text style={styles.moreAmenities}>+{gym.amenities.length - 4}</Text>
+          {/* Badges */}
+          <View style={styles.badgeRow}>
+            {isVerified && <VerifiedBadge size="sm" showLabel={false} />}
+            {isPopular && <PopularBadge />}
+            {isNew && <NewBadge />}
+          </View>
+
+          {/* Save Button */}
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={() => {
+              haptics.heart();
+              onSaveToggle?.(gym.id.toString());
+            }}
+            activeOpacity={0.7}
+          >
+            <Heart
+              size={iconSizes.md}
+              color={isSaved ? colors.error : colors.white}
+              fill={isSaved ? colors.error : 'transparent'}
+              strokeWidth={2}
+            />
+          </TouchableOpacity>
+
+          {/* Price Tag */}
+          <View style={styles.priceTag}>
+            <Text style={styles.priceText}>${gym.dayPassPrice}</Text>
+          </View>
+
+          {/* Viewing count */}
+          {viewingCount && viewingCount > 0 && (
+            <View style={styles.viewingBadge}>
+              <Text style={styles.viewingText}>{viewingCount} viewing</Text>
+            </View>
           )}
         </View>
 
-        {/* Location */}
-        <Text style={styles.address} numberOfLines={1}>
-          📍 {gym.address}
-        </Text>
-      </View>
-    </Pressable>
+        {/* Info Section */}
+        <View style={styles.infoSection}>
+          <View style={styles.header}>
+            <View style={styles.titleSection}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name} numberOfLines={2}>
+                  {gym.name}
+                </Text>
+                {isVerified && (
+                  <BadgeCheck size={iconSizes.sm} color={colors.info} fill={colors.info} />
+                )}
+              </View>
+              <View style={styles.ratingRow}>
+                <Star size={iconSizes.sm} color={colors.warning} fill={colors.warning} />
+                <Text style={styles.rating}>{gym.rating.toFixed(1)}</Text>
+                <Text style={styles.reviewCount}>({gym.reviewCount})</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Amenities */}
+          <View style={styles.amenitiesRow}>
+            {gym.amenities.slice(0, 4).map((amenity, index) => (
+              <View key={index} style={styles.amenityChip}>
+                <Text style={styles.amenityText}>{amenity}</Text>
+              </View>
+            ))}
+            {gym.amenities.length > 4 && (
+              <Text style={styles.moreAmenities}>+{gym.amenities.length - 4}</Text>
+            )}
+          </View>
+
+          {/* Location */}
+          <View style={styles.locationRow}>
+            <MapPin size={iconSizes.sm} color={colors.gray500} />
+            <Text style={styles.address} numberOfLines={1}>
+              {gym.address}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -166,6 +224,26 @@ const styles = StyleSheet.create({
     ...typography.bodyBold,
     color: colors.white,
   },
+  badgeRow: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  viewingBadge: {
+    position: 'absolute',
+    bottom: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.sm,
+  },
+  viewingText: {
+    ...typography.tiny,
+    color: colors.white,
+  },
   infoSection: {
     padding: spacing.lg,
     gap: spacing.md,
@@ -176,18 +254,25 @@ const styles = StyleSheet.create({
   titleSection: {
     gap: spacing.xs,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   name: {
     ...typography.h4,
     color: colors.black,
+    flex: 1,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   rating: {
     ...typography.small,
     color: colors.gray700,
+    marginLeft: spacing.xs,
   },
   reviewCount: {
     ...typography.small,
@@ -196,17 +281,31 @@ const styles = StyleSheet.create({
   amenitiesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
-  amenityIcon: {
-    fontSize: 16,
+  amenityChip: {
+    backgroundColor: colors.gray100,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.sm,
+  },
+  amenityText: {
+    ...typography.tiny,
+    color: colors.gray700,
   },
   moreAmenities: {
     ...typography.small,
     color: colors.gray500,
   },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   address: {
     ...typography.small,
     color: colors.gray700,
+    flex: 1,
   },
 });

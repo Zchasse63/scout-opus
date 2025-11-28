@@ -14,16 +14,19 @@ import { colors } from '../../constants/colors';
 import { padding, spacing, radius } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
 import { useBookingStore } from '../../stores/bookingStore';
+import { haptics } from '../../utils/haptics';
 
 export default function ConfirmationScreen() {
   const router = useRouter();
   const { selectedGym, passType, selectedDate } = useBookingStore();
   const [qrValue, setQrValue] = useState('');
 
-  // Generate QR code value (booking ID)
+  // Generate QR code value (booking ID) and trigger celebration
   useEffect(() => {
     const bookingId = `SCOUT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     setQrValue(bookingId);
+    // Trigger celebration haptic on successful booking
+    haptics.celebration();
   }, []);
 
   if (!selectedGym || !passType) {

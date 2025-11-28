@@ -1,8 +1,10 @@
 import { serve } from "https://deno.land/std@0.132.0/http/server.ts";
+import { validateRequest, schemas } from "../_shared/validation.ts";
 
 const EXPO_ACCESS_TOKEN = Deno.env.get("EXPO_ACCESS_TOKEN");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-type PushType = 
+type PushType =
   | "booking_confirmed"
   | "booking_reminder"
   | "payment_received"
@@ -10,12 +12,6 @@ type PushType =
   | "travel_alert"
   | "streak_reminder"
   | "badge_earned";
-
-interface PushRequest {
-  pushTokens: string[];
-  type: PushType;
-  data: Record<string, string | number>;
-}
 
 interface ExpoPushMessage {
   to: string;
@@ -88,15 +84,25 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  try {
-    const { pushTokens, type, data } = await req.json() as PushRequest;
+  // Validate service role key (this function is called by server-side processes)
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.includes(SUPABASE_SERVICE_ROLE_KEY!)) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized - service role key required" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
 
-    if (!pushTokens || !pushTokens.length || !type) {
+  try {
+    // Validate request body with Zod schema
+    const validation = await validateRequest(req, schemas.sendPush);
+    if (!validation.success) {
       return new Response(
-        JSON.stringify({ error: "pushTokens array and type are required" }),
+        JSON.stringify({ error: validation.error }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
+    const { pushTokens, type, data } = validation.data;
 
     const content = getPushContent(type, data || {});
 

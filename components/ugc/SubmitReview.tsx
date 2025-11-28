@@ -62,14 +62,15 @@ export const SubmitReview: React.FC<SubmitReviewProps> = ({
         .limit(1)
         .single();
 
-      // Insert review into gym_reviews table
+      // Insert review into consolidated reviews table
       const { error: insertError } = await supabase
-        .from('gym_reviews')
+        .from('reviews')
         .insert({
           gym_id: gymId,
           user_id: user.id,
+          booking_id: booking?.id || null,
           rating,
-          review_text: reviewText.trim(),
+          comment: reviewText.trim(),
           moderation_status: 'pending',
           has_verified_booking: !!booking,
         });

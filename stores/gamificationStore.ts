@@ -14,7 +14,7 @@ export interface Badge {
 
 export interface Achievement {
   id: string;
-  type: 'first_booking' | 'gym_visited' | 'streak' | 'review' | 'referral' | 'milestone';
+  type: 'first_booking' | 'gym_visited' | 'streak' | 'review' | 'referral' | 'milestone' | 'achievement';
   title: string;
   description: string;
   points: number;
@@ -59,6 +59,12 @@ interface GamificationStore {
   // Tracked cities (for unique counting)
   visitedCities: Set<string>;
 
+  // Loading states
+  isLoading: boolean;
+  isSyncing: boolean;
+  isLeaderboardLoading: boolean;
+  error: string | null;
+
   // Actions
   addPoints: (points: number, reason: string) => void;
   unlockBadge: (badgeId: string) => void;
@@ -69,6 +75,7 @@ interface GamificationStore {
   setLeaderboard: (data: any[]) => void;
   calculateLevel: () => UserLevel;
   getProgressToNextLevel: () => { current: number; required: number; percentage: number };
+  clearError: () => void;
 
   // Database sync
   syncFromDatabase: () => Promise<void>;
@@ -186,6 +193,14 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
   leaderboardRank: null,
   leaderboardData: [],
   visitedCities: new Set<string>(),
+
+  // Loading states
+  isLoading: false,
+  isSyncing: false,
+  isLeaderboardLoading: false,
+  error: null,
+
+  clearError: () => set({ error: null }),
 
   addPoints: (points, reason) => {
     const newTotal = get().totalPoints + points;
@@ -346,9 +361,13 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
 
   // Sync stats from database
   syncFromDatabase: async () => {
+    set({ isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        set({ isLoading: false });
+        return;
+      }
 
       const { data: stats, error } = await supabase
         .from('user_stats')
@@ -358,6 +377,7 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
 
       if (error && error.code !== 'PGRST116') { // Ignore "not found" error
         console.error('Failed to fetch user stats:', error);
+        set({ isLoading: false, error: 'Failed to load gamification data' });
         return;
       }
 
@@ -378,16 +398,22 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
         const level = get().calculateLevel();
         set({ currentLevel: level.level });
       }
+      set({ isLoading: false });
     } catch (error) {
       console.error('Error syncing from database:', error);
+      set({ isLoading: false, error: 'Failed to load gamification data' });
     }
   },
 
   // Sync stats to database
   syncToDatabase: async () => {
+    set({ isSyncing: true });
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        set({ isSyncing: false });
+        return;
+      }
 
       const state = get();
       const citiesArray = Array.from(state.visitedCities);
@@ -411,14 +437,19 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
 
       if (error) {
         console.error('Failed to sync user stats:', error);
+        set({ isSyncing: false, error: 'Failed to save progress' });
+        return;
       }
+      set({ isSyncing: false });
     } catch (error) {
       console.error('Error syncing to database:', error);
+      set({ isSyncing: false, error: 'Failed to save progress' });
     }
   },
 
   // Fetch leaderboard from database
   fetchLeaderboard: async () => {
+    set({ isLeaderboardLoading: true });
     try {
       const { data, error } = await supabase
         .from('user_stats')
@@ -436,6 +467,7 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
 
       if (error) {
         console.error('Failed to fetch leaderboard:', error);
+        set({ isLeaderboardLoading: false, error: 'Failed to load leaderboard' });
         return;
       }
 
@@ -452,8 +484,10 @@ export const useGamificationStore = create<GamificationStore>((set, get) => ({
 
         get().setLeaderboard(leaderboardData);
       }
+      set({ isLeaderboardLoading: false });
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
+      set({ isLeaderboardLoading: false, error: 'Failed to load leaderboard' });
     }
   },
 }));

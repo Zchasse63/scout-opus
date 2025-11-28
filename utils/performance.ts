@@ -263,4 +263,105 @@ export const logMemoryUsage = (): void => {
   }
 };
 
-import React from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
+import { Image } from 'react-native';
+
+// ============ Image Optimization ============
+
+// Image prefetching for faster loads
+export async function prefetchImages(urls: string[]): Promise<void> {
+  await Promise.all(urls.map(url => Image.prefetch(url)));
+}
+
+// Image size optimization based on display size
+export function getOptimizedImageUrl(url: string, width: number, quality = 80): string {
+  if (url.includes('unsplash.com')) return `${url}&w=${width}&q=${quality}&fm=webp`;
+  if (url.includes('cloudinary.com')) return url.replace('/upload/', `/upload/w_${width},q_${quality},f_auto/`);
+  if (url.includes('imgix.net')) return `${url}${url.includes('?') ? '&' : '?'}w=${width}&q=${quality}&auto=format`;
+  return url;
+}
+
+// Progressive image loading hook
+export function useProgressiveImage(lowQualitySrc: string, highQualitySrc: string) {
+  const [src, setSrc] = useState(lowQualitySrc);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setSrc(lowQualitySrc);
+    setIsLoading(true);
+    Image.prefetch(highQualitySrc).then(() => { setSrc(highQualitySrc); setIsLoading(false); }).catch(() => setIsLoading(false));
+  }, [lowQualitySrc, highQualitySrc]);
+
+  return { src, isLoading };
+}
+
+// ============ Debounce & Throttle ============
+
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+export function useThrottle<T>(value: T, interval: number): T {
+  const [throttledValue, setThrottledValue] = useState(value);
+  const lastUpdated = useRef(Date.now());
+
+  useEffect(() => {
+    const now = Date.now();
+    if (now - lastUpdated.current >= interval) {
+      lastUpdated.current = now;
+      setThrottledValue(value);
+    } else {
+      const timer = setTimeout(() => { lastUpdated.current = Date.now(); setThrottledValue(value); }, interval - (now - lastUpdated.current));
+      return () => clearTimeout(timer);
+    }
+  }, [value, interval]);
+
+  return throttledValue;
+}
+
+// ============ Optimistic Updates ============
+
+export function useOptimisticUpdate<T>(initialValue: T, persistFn: (value: T) => Promise<T>) {
+  const [value, setValue] = useState(initialValue);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const update = useCallback(async (newValue: T) => {
+    const previousValue = value;
+    setValue(newValue);
+    setIsPending(true);
+    setError(null);
+
+    try {
+      const result = await persistFn(newValue);
+      setValue(result);
+    } catch (e) {
+      setValue(previousValue);
+      setError(e instanceof Error ? e : new Error('Unknown error'));
+    } finally {
+      setIsPending(false);
+    }
+  }, [value, persistFn]);
+
+  return { value, update, isPending, error };
+}
+
+// ============ FlatList Performance ============
+
+export const FLATLIST_PERFORMANCE_CONFIG = {
+  removeClippedSubviews: true,
+  maxToRenderPerBatch: 10,
+  updateCellsBatchingPeriod: 50,
+  windowSize: 5,
+  initialNumToRender: 10,
+  getItemLayout: (itemHeight: number) => (data: any, index: number) => ({
+    length: itemHeight,
+    offset: itemHeight * index,
+    index,
+  }),
+};

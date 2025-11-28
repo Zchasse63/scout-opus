@@ -115,7 +115,7 @@ export const SubmitPhoto: React.FC<SubmitPhotoProps> = ({
       for (const imageUri of selectedImages) {
         // Read the file as base64
         const base64 = await FileSystem.readAsStringAsync(imageUri, {
-          encoding: FileSystem.EncodingType.Base64,
+          encoding: 'base64',
         });
 
         // Generate unique filename

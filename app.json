@@ -20,6 +20,10 @@
       "entitlements": {
         "keychain-access-groups": ["group.com.scoutfitness.app"],
         "com.apple.developer.associated-domains": ["applinks:scoutfitness.app"]
+      },
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Scout uses speech recognition to understand your gym search queries.",
+        "NSMicrophoneUsageDescription": "Scout needs microphone access to hear your voice search queries."
       }
     },
     "android": {

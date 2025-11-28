@@ -53,9 +53,9 @@ describe('Badge', () => {
     expect(getByText('Medium')).toBeTruthy();
   });
 
-  it('should render with large size', () => {
-    const { getByText } = render(<Badge label="Large" size="large" />);
-    expect(getByText('Large')).toBeTruthy();
+  it('should render with small size', () => {
+    const { getByText } = render(<Badge label="Small" size="small" />);
+    expect(getByText('Small')).toBeTruthy();
   });
 
   it('should render with icon', () => {

@@ -260,7 +260,6 @@ const styles = StyleSheet.create({
   },
   cardField: {
     backgroundColor: colors.white,
-    textColor: colors.black,
   },
   waiverSection: {
     backgroundColor: colors.gray100,

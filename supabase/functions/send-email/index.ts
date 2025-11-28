@@ -1,9 +1,11 @@
 import { serve } from "https://deno.land/std@0.132.0/http/server.ts";
+import { validateRequest, schemas } from "../_shared/validation.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Scout <noreply@scoutfitness.app>";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-type EmailType = 
+type EmailType =
   | "partner_approved"
   | "partner_rejected"
   | "booking_confirmed"
@@ -11,12 +13,6 @@ type EmailType =
   | "refund_processed"
   | "support_reply"
   | "welcome";
-
-interface EmailRequest {
-  to: string;
-  type: EmailType;
-  data: Record<string, string | number>;
-}
 
 interface EmailTemplate {
   subject: string;
@@ -159,15 +155,25 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  try {
-    const { to, type, data } = await req.json() as EmailRequest;
+  // Validate service role key (this function is called by server-side processes)
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.includes(SUPABASE_SERVICE_ROLE_KEY!)) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized - service role key required" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
 
-    if (!to || !type) {
+  try {
+    // Validate request body with Zod schema
+    const validation = await validateRequest(req, schemas.sendEmail);
+    if (!validation.success) {
       return new Response(
-        JSON.stringify({ error: "to and type are required" }),
+        JSON.stringify({ error: validation.error }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
+    const { to, type, data } = validation.data;
 
     const template = getEmailTemplate(type, data || {});
 

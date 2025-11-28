@@ -50,12 +50,24 @@ serve(async (req) => {
     const photoData = await response.arrayBuffer();
     const contentType = response.headers.get('content-type') || 'image/jpeg';
 
-    // Return photo with appropriate headers
+    // Generate ETag from photo name and dimensions for cache validation
+    const etag = `"${btoa(`${photoName}-${width}x${height}`).slice(0, 32)}"`;
+
+    // Return photo with CDN-optimized caching headers
     return new Response(photoData, {
       headers: {
         ...corsHeaders,
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+        // Cache for 7 days in browser, 30 days in CDN
+        'Cache-Control': 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=86400',
+        // ETag for cache validation
+        'ETag': etag,
+        // Vary header for proper CDN caching
+        'Vary': 'Accept-Encoding',
+        // CDN cache key hints
+        'CDN-Cache-Control': 'max-age=2592000',
+        // Cloudflare-specific cache hints
+        'CF-Cache-Status': 'DYNAMIC',
       },
       status: 200,
     });

@@ -72,9 +72,9 @@ export const PassTypeSelector: React.FC<PassTypeSelectorProps> = ({
             ]}>
               {option.description}
             </Text>
-            {option.savings > 0 && (
+            {option.savings && option.savings > 0 && (
               <Text style={styles.savings}>
-                Save {option.savings.toFixed(0)}%
+                Save {option.savings?.toFixed(0)}%
               </Text>
             )}
           </View>

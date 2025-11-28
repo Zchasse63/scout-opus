@@ -11,6 +11,17 @@ interface PlacesSearchRequest {
     };
   };
   includedType?: string;
+  page?: number;
+  pageSize?: number;
+  pageToken?: string;
+}
+
+interface PlacesSearchResponse {
+  places: unknown[];
+  nextPageToken?: string;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 }
 
 serve(async (req) => {
@@ -19,7 +30,7 @@ serve(async (req) => {
   }
 
   try {
-    const { textQuery, locationBias, includedType } = await req.json() as PlacesSearchRequest;
+    const { textQuery, locationBias, includedType, page = 1, pageSize = 20, pageToken } = await req.json() as PlacesSearchRequest;
 
     if (!textQuery) {
       return new Response(
@@ -28,12 +39,15 @@ serve(async (req) => {
       );
     }
 
+    // Validate pagination params
+    const validPageSize = Math.min(Math.max(1, pageSize), 20); // Google Places max is 20
+
     // Call Google Places API (New)
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       textQuery,
       locationBias,
       includedType: includedType || "gym",
-      maxResultCount: 20,
+      maxResultCount: validPageSize,
       fields: [
         "places.id",
         "places.displayName",
@@ -44,9 +58,19 @@ serve(async (req) => {
         "places.regularOpeningHours",
         "places.generativeSummary",
         "places.photos",
+        "places.accessibilityOptions",
+        "places.parkingOptions",
+        "places.paymentOptions",
+        "places.reviewSummary",
+        "places.addressDescriptor",
       ],
       languageCode: "en",
     };
+
+    // Add page token for pagination if provided
+    if (pageToken) {
+      requestBody.pageToken = pageToken;
+    }
 
     const response = await fetch(
       "https://places.googleapis.com/v1/places:searchText",
@@ -66,8 +90,17 @@ serve(async (req) => {
 
     const data = await response.json();
 
+    // Return paginated response
+    const paginatedResponse: PlacesSearchResponse = {
+      places: data.places || [],
+      nextPageToken: data.nextPageToken,
+      page,
+      pageSize: validPageSize,
+      hasMore: !!data.nextPageToken,
+    };
+
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify(paginatedResponse),
       { headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {

@@ -19,8 +19,9 @@
 
 | Document | Description |
 |----------|-------------|
-| [NEXT_STEPS.md](NEXT_STEPS.md) | **Current status and immediate next actions** |
-| [INTEGRATION_AUDIT.md](INTEGRATION_AUDIT.md) | **Critical** - 3 issues to fix before launch |
+| [PHASE_UIUX_IMPLEMENTATION_PLAN_2025-11-26.md](PHASE_UIUX_IMPLEMENTATION_PLAN_2025-11-26.md) | **NEW** - Complete UI/UX redesign roadmap (1,263 lines) |
+| [NEXT_STEPS.md](NEXT_STEPS.md) | Current status and immediate next actions |
+| [INTEGRATION_AUDIT.md](INTEGRATION_AUDIT.md) | Critical - 3 issues to fix before launch |
 
 ---
 
@@ -30,6 +31,8 @@
 
 | Document | Purpose | Status |
 |----------|---------|--------|
+| [PHASE_UIUX_IMPLEMENTATION_PLAN_2025-11-26.md](PHASE_UIUX_IMPLEMENTATION_PLAN_2025-11-26.md) | Complete UI/UX redesign plan | 🆕 New |
+| [UI UX Audit.md](UI%20UX%20Audit.md) | UI/UX audit framework | ✅ Current |
 | [NEXT_STEPS.md](NEXT_STEPS.md) | Current status & next actions | ✅ Current |
 | [INTEGRATION_AUDIT.md](INTEGRATION_AUDIT.md) | Integration issues to fix | ✅ Current |
 | [AUDIT_REMEDIATION_PLAN.md](AUDIT_REMEDIATION_PLAN.md) | Original remediation plan | ✅ Complete |

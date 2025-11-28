@@ -1,98 +1,150 @@
-import { useState, useCallback } from 'react';
-import { Audio } from 'expo-av';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { Platform } from 'react-native';
+import Voice, {
+  SpeechResultsEvent,
+  SpeechErrorEvent,
+  SpeechStartEvent,
+  SpeechEndEvent,
+} from '@react-native-voice/voice';
 import { supabase } from '../lib/supabase';
 import type { VoiceQueryResult } from '../types';
 
 type RecordingState = 'idle' | 'recording' | 'processing' | 'results';
 
+interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 interface UseVoiceSearchReturn {
   recordingState: RecordingState;
   transcript: string;
+  partialTranscript: string;
   intent: VoiceQueryResult | null;
   isRecording: boolean;
   isProcessing: boolean;
   error: string | null;
+  conversationHistory: ConversationMessage[];
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   resetState: () => void;
+  clearConversation: () => void;
 }
 
 export function useVoiceSearch(): UseVoiceSearchReturn {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [transcript, setTranscript] = useState('');
+  const [partialTranscript, setPartialTranscript] = useState('');
   const [intent, setIntent] = useState<VoiceQueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
+
+  // Keep track of the last intent for refinement queries
+  const lastIntentRef = useRef<VoiceQueryResult | null>(null);
+  const finalTranscriptRef = useRef<string>('');
+
+  // Set up Voice event listeners
+  useEffect(() => {
+    const onSpeechStart = (_e: SpeechStartEvent) => {
+      setRecordingState('recording');
+      setPartialTranscript('');
+      finalTranscriptRef.current = '';
+    };
+
+    const onSpeechEnd = (_e: SpeechEndEvent) => {
+      // Speech ended, will process in stopRecording
+    };
+
+    const onSpeechResults = (e: SpeechResultsEvent) => {
+      // Final results - use the first (most confident) result
+      if (e.value && e.value.length > 0) {
+        finalTranscriptRef.current = e.value[0];
+        setTranscript(e.value[0]);
+      }
+    };
+
+    const onSpeechPartialResults = (e: SpeechResultsEvent) => {
+      // Real-time partial results as user speaks
+      if (e.value && e.value.length > 0) {
+        setPartialTranscript(e.value[0]);
+      }
+    };
+
+    const onSpeechError = (e: SpeechErrorEvent) => {
+      console.error('Speech recognition error:', e.error);
+      setError(e.error?.message || 'Speech recognition failed');
+      setRecordingState('idle');
+    };
+
+    // Register listeners
+    Voice.onSpeechStart = onSpeechStart;
+    Voice.onSpeechEnd = onSpeechEnd;
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechPartialResults = onSpeechPartialResults;
+    Voice.onSpeechError = onSpeechError;
+
+    // Cleanup on unmount
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
 
   const startRecording = useCallback(async () => {
     try {
       setError(null);
-      const { granted } = await Audio.requestPermissionsAsync();
+      setTranscript('');
+      setPartialTranscript('');
+      finalTranscriptRef.current = '';
 
-      if (!granted) {
-        setError('Microphone permission denied');
+      // Check if speech recognition is available
+      const isAvailable = await Voice.isAvailable();
+      if (!isAvailable) {
+        setError('Speech recognition is not available on this device');
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      setRecording(newRecording);
+      // Start listening with locale
+      await Voice.start('en-US');
       setRecordingState('recording');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start recording');
+      console.error('Failed to start voice recognition:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start voice recognition');
+      setRecordingState('idle');
     }
   }, []);
 
   const stopRecording = useCallback(async () => {
-    if (!recording) return;
-
     try {
       setRecordingState('processing');
-      await recording.stopAndUnloadAsync();
 
-      // Get the URI of the recorded audio
-      const uri = recording.getURI();
-      if (!uri) {
-        throw new Error('Failed to get recording URI');
-      }
+      // Stop the voice recognition
+      await Voice.stop();
 
-      // Read the audio file as base64
-      const audioBase64 = await readFileAsBase64(uri);
+      // Wait a brief moment for final results to arrive
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Step 1: Transcribe audio using Whisper via voice-transcribe
-      const { data: transcriptionData, error: transcribeError } = await supabase.functions.invoke(
-        'voice-transcribe',
-        {
-          body: {
-            audioData: audioBase64,
-          },
-        }
-      );
+      const transcriptText = finalTranscriptRef.current || transcript;
 
-      if (transcribeError) {
-        throw transcribeError;
-      }
-
-      const transcriptText = transcriptionData?.transcript;
       if (!transcriptText) {
-        throw new Error('Failed to transcribe audio');
+        setError('No speech detected. Please try again.');
+        setRecordingState('idle');
+        return;
       }
 
       setTranscript(transcriptText);
 
-      // Step 2: Process transcript to extract search intent via voice-process-query
+      // Process transcript to extract search intent via voice-process-query
+      // Pass conversation history and previous intent for refinement
       const { data: intentData, error: intentError } = await supabase.functions.invoke(
         'voice-process-query',
         {
           body: {
             transcript: transcriptText,
+            conversationHistory: conversationHistory.map(msg => ({
+              role: msg.role,
+              content: msg.content,
+            })),
+            previousIntent: lastIntentRef.current,
           },
         }
       );
@@ -103,53 +155,79 @@ export function useVoiceSearch(): UseVoiceSearchReturn {
 
       // Extract parsed intent from response
       const parsedIntent = intentData?.parsedIntent || null;
-      setIntent(parsedIntent);
+
+      // If this is a refinement, merge with previous intent
+      let finalIntent = parsedIntent;
+      if (parsedIntent?.is_refinement && lastIntentRef.current) {
+        finalIntent = {
+          ...lastIntentRef.current,
+          ...parsedIntent,
+          // Merge arrays instead of replacing
+          facility_types: [
+            ...new Set([
+              ...(lastIntentRef.current.facilityTypes || []),
+              ...(parsedIntent.facility_types || []),
+            ]),
+          ],
+          required_amenities: [
+            ...new Set([
+              ...(lastIntentRef.current.amenities || []),
+              ...(parsedIntent.required_amenities || []),
+            ]),
+          ],
+        };
+      }
+
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: transcriptText },
+        { role: 'assistant', content: JSON.stringify(finalIntent) },
+      ]);
+
+      // Store for next refinement
+      lastIntentRef.current = finalIntent;
+
+      setIntent(finalIntent);
       setRecordingState('results');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to stop recording');
+      console.error('Failed to process voice search:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process voice search');
       setRecordingState('idle');
     }
-  }, [recording]);
+  }, [transcript, conversationHistory]);
 
   const resetState = useCallback(() => {
     setRecordingState('idle');
     setTranscript('');
+    setPartialTranscript('');
     setIntent(null);
     setError(null);
+    // Keep conversation history for follow-up queries
+  }, []);
+
+  const clearConversation = useCallback(() => {
+    setRecordingState('idle');
+    setTranscript('');
+    setPartialTranscript('');
+    setIntent(null);
+    setError(null);
+    setConversationHistory([]);
+    lastIntentRef.current = null;
   }, []);
 
   return {
     recordingState,
     transcript,
+    partialTranscript,
     intent,
     isRecording: recordingState === 'recording',
     isProcessing: recordingState === 'processing',
     error,
+    conversationHistory,
     startRecording,
     stopRecording,
     resetState,
+    clearConversation,
   };
-}
-
-/**
- * Helper function to read a file from URI and convert to base64
- * Note: In production, we'd use expo-file-system, but for now we use a fetch-based approach
- */
-async function readFileAsBase64(uri: string): Promise<string> {
-  try {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]); // Remove data:audio/wav;base64, prefix
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (err) {
-    console.error('Error reading file as base64:', err);
-    throw new Error('Failed to process audio file');
-  }
 }

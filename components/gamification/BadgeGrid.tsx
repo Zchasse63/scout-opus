@@ -16,7 +16,7 @@ export const BadgeGrid: React.FC = () => {
     return (
       <Card
         key={badge.id}
-        style={[styles.badgeCard, !isUnlocked && styles.lockedBadge]}
+        style={[styles.badgeCard, !isUnlocked ? styles.lockedBadge : undefined]}
         pressable={false}
       >
         <View style={styles.badgeIcon}>

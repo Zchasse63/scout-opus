@@ -11,16 +11,17 @@
 
 This audit analyzes the Scout fitness app ("Airbnb for Gyms") for integration integrity across all layers. The app is a React Native/Expo application with Supabase backend and 17 Edge Functions.
 
-### Overall Health: ✅ CRITICAL ISSUES FIXED
+### Overall Health: ✅ ALL HIGH PRIORITY ISSUES FIXED
 
 | Category | Status | Issues |
 |----------|--------|--------|
 | Tech Stack | ✅ Good | None |
 | API Integration | ✅ Fixed | ~~3 contract mismatches~~ → All fixed |
-| Database | ✅ Fixed | ~~2 schema inconsistencies~~ → Migration created |
+| Database | ✅ Fixed | ~~4 schema inconsistencies~~ → All migrations applied |
 | Auth Flow | ✅ Good | None |
 | External APIs | ⚠️ Issues | Missing error handling |
-| Configuration | ⚠️ Issues | 5 missing env vars |
+| Configuration | ⚠️ Issues | Some env vars needed (user providing) |
+| Voice Search | ✅ Fixed | Native iOS SFSpeechRecognizer (no OpenAI needed) |
 
 ### ✅ Critical Issues Fixed (Nov 26, 2025)
 
@@ -29,6 +30,14 @@ This audit analyzes the Scout fitness app ("Airbnb for Gyms") for integration in
 | Payment function name mismatch | `services/payment.ts` → `payments-create-intent` |
 | Partners table missing gym_id | `migrations/004_add_gym_id_to_partners.sql` |
 | Voice search flow broken | `hooks/useVoiceSearch.ts` → calls transcribe first |
+
+### ✅ High Priority Issues Fixed (Nov 26, 2025)
+
+| Issue | Fix Applied |
+|-------|-------------|
+| Gamification store column mismatches | `migrations/006_schema_fixes.sql` → Added `total_workouts`, `unlocked_badges`, `gyms_visited` columns |
+| Booking status CHECK constraint | `migrations/006_schema_fixes.sql` → Added 'pending', 'expired' to constraint |
+| Duplicate trip stores | Removed orphan `tripStore.ts`, kept `tripsStore.ts` which is actively used |
 
 ---
 
@@ -371,18 +380,13 @@ The hook sends `audioData` directly to `voice-process-query`, but that function 
 
 ### 🟡 High Priority Issues
 
-#### Issue 4: Gamification Store Column Mismatches
+#### ~~Issue 4: Gamification Store Column Mismatches~~ ✅ FIXED
 **Location:** `stores/gamificationStore.ts:395-407`
+**Fix:** `migrations/006_schema_fixes.sql` added missing columns to `user_stats` table.
 
-Columns used that don't exist in `user_stats`:
-- `gyms_visited` → should be `unique_gyms_visited`
-- `total_workouts` → doesn't exist
-- `unlocked_badges` → doesn't exist
-
-#### Issue 5: Partners Table Missing gym_id FK
+#### ~~Issue 5: Partners Table Missing gym_id FK~~ ✅ FIXED
 **Location:** `supabase/functions/payments-create-intent/index.ts:63-68`
-
-Query filters by `gym_id` but `partners` table has no `gym_id` column.
+**Fix:** `migrations/004_add_gym_id_to_partners.sql` added `gym_id` column.
 
 #### Issue 6: Gym ID Type Mismatch
 **Location:** Multiple files
@@ -398,18 +402,19 @@ This causes issues when trying to book a gym found via Google Places.
 #### Issue 7: Missing CORS Headers
 Some Edge Functions don't return CORS headers on error responses.
 
-#### Issue 8: Duplicate Store Files
-Both `tripStore.ts` and `tripsStore.ts` exist in `/stores`.
+#### ~~Issue 8: Duplicate Store Files~~ ✅ FIXED
+~~Both `tripStore.ts` and `tripsStore.ts` exist in `/stores`.~~
+**Fix:** Removed orphan `tripStore.ts`. `tripsStore.ts` is the active store used by the app.
 
 ---
 
 ## Section 9: Missing or Orphaned Code
 
 ### Orphaned Files
-| File | Issue |
-|------|-------|
-| `stores/tripsStore.ts` | Duplicate of `tripStore.ts` |
-| `stores/mapStore.ts` | Used but not imported in some components |
+| File | Issue | Status |
+|------|-------|--------|
+| ~~`stores/tripStore.ts`~~ | ~~Duplicate of `tripsStore.ts`~~ | ✅ Removed |
+| `stores/mapStore.ts` | Used but not imported in some components | ⚠️ Review |
 
 ### Missing Implementations
 | Feature | Status |

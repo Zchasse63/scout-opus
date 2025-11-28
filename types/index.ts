@@ -1,3 +1,6 @@
+// Re-export database types
+export * from './database';
+
 // Auth Types
 export interface AuthUser {
   id: string;
@@ -25,6 +28,41 @@ export interface Gym {
   googlePlaceId?: string;
   hours?: GymHours;
   isSaved?: boolean;
+  // Google's AI-generated summary from Places API
+  aiSummary?: string;
+  // AI review summary (different from generativeSummary)
+  reviewSummary?: string;
+  // Accessibility options (wheelchair accessible entrance/parking/restroom/seating)
+  accessibilityOptions?: {
+    wheelchairAccessibleEntrance?: boolean;
+    wheelchairAccessibleParking?: boolean;
+    wheelchairAccessibleRestroom?: boolean;
+    wheelchairAccessibleSeating?: boolean;
+  };
+  // Parking availability
+  parkingOptions?: {
+    freeParkingLot?: boolean;
+    paidParkingLot?: boolean;
+    freeStreetParking?: boolean;
+    paidStreetParking?: boolean;
+    valetParking?: boolean;
+    freeGarageParking?: boolean;
+    paidGarageParking?: boolean;
+  };
+  // Payment methods accepted
+  paymentOptions?: {
+    acceptsCreditCards?: boolean;
+    acceptsDebitCards?: boolean;
+    acceptsCashOnly?: boolean;
+    acceptsNfc?: boolean;
+  };
+  // Location context (e.g., "Near Central Park")
+  addressDescriptor?: string;
+  // Personalized match reasons (populated client-side)
+  personalization?: {
+    matchScore: number;
+    reasons: string[];
+  };
 }
 
 export interface GymHours {
@@ -48,12 +86,15 @@ export interface SearchQuery {
 }
 
 export interface VoiceQueryResult {
-  intent: 'search_gyms' | 'get_details' | 'book_pass' | 'check_schedule';
+  intent: 'search_gyms' | 'refine_search' | 'compare' | 'get_details' | 'book_pass' | 'check_schedule';
   location?: { query: string; useCurrentLocation: boolean };
   facilityTypes: string[];
   amenities: string[];
   timeConstraint?: string;
   priceConstraint?: { max: number };
+  sortBy?: 'distance' | 'price' | 'rating';
+  isRefinement?: boolean;
+  confidence?: number;
 }
 
 // Booking Types

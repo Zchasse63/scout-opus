@@ -68,7 +68,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     return (
       <Image
         source={{ uri: source }}
-        style={[styles.image, containerStyle, style]}
+        style={[styles.image, containerStyle, style as any]}
       />
     );
   }

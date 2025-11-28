@@ -123,6 +123,15 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Validate service role key (this function is called by server-side processes)
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.includes(SUPABASE_SERVICE_ROLE_KEY)) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized - service role key required" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const { type, data, priority = "medium" } = await req.json() as AlertRequest;
 

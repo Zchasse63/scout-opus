@@ -1,13 +1,24 @@
-export const DEFAULT_FILTERS = [
-  { id: 'gym', label: 'Gym', icon: '🏋️' },
-  { id: 'yoga', label: 'Yoga', icon: '🧘' },
-  { id: 'crossfit', label: 'CrossFit', icon: '💪' },
-  { id: 'cycling', label: 'Cycling', icon: '🚴' },
-  { id: 'boxing', label: 'Boxing', icon: '🥊' },
-  { id: 'sauna', label: 'Sauna', icon: '🧖' },
-  { id: 'pool', label: 'Pool', icon: '🏊' },
-  { id: '24hr', label: '24hr', icon: '⏰' },
+import { FilterIcons, getFilterIcon } from './icons';
+import type { LucideIcon } from 'lucide-react-native';
+
+export interface Filter {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+export const DEFAULT_FILTERS: Filter[] = [
+  { id: 'gym', label: 'Gym', icon: FilterIcons.gym },
+  { id: 'yoga', label: 'Yoga', icon: FilterIcons.yoga },
+  { id: 'crossfit', label: 'CrossFit', icon: FilterIcons.crossfit },
+  { id: 'cycling', label: 'Cycling', icon: FilterIcons.cycling },
+  { id: 'boxing', label: 'Boxing', icon: FilterIcons.boxing },
+  { id: 'sauna', label: 'Sauna', icon: FilterIcons.sauna },
+  { id: 'pool', label: 'Pool', icon: FilterIcons.pool },
+  { id: '24hr', label: '24hr', icon: FilterIcons['24hr'] },
 ];
+
+export { getFilterIcon };
 
 export const FACILITY_TYPES = {
   gym: 'Gym',

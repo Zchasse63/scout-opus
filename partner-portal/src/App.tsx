@@ -9,8 +9,10 @@ import Financials from './pages/Financials';
 import QRScanner from './pages/QRScanner';
 import StripeOnboarding from './pages/StripeOnboarding';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 
-function App() {
+function AppRoutes() {
   const { isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated) {
@@ -34,6 +36,16 @@ function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <AppRoutes />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 

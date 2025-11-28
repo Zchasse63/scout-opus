@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type { Gym } from '../types';
 
@@ -8,17 +8,35 @@ interface SearchOptions {
   longitude?: number;
   filters?: string[];
   query?: string;
+  pageSize?: number;
+}
+
+interface PlacesSearchResponse {
+  places: unknown[];
+  nextPageToken?: string;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 }
 
 export function useGymSearch(options: SearchOptions = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<string[]>(options.filters || []);
+  const pageSize = options.pageSize || 20;
 
-  const { data: results, isLoading, error, refetch } = useQuery({
-    queryKey: ['gyms', searchQuery, filters, options.latitude, options.longitude],
-    queryFn: async () => {
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['gyms', searchQuery, filters, options.latitude, options.longitude, pageSize],
+    queryFn: async ({ pageParam }) => {
       if (!searchQuery && filters.length === 0) {
-        return [];
+        return { places: [], page: 1, pageSize, hasMore: false } as PlacesSearchResponse;
       }
 
       try {
@@ -31,23 +49,29 @@ export function useGymSearch(options: SearchOptions = {}) {
             textQuery,
             latitude: options.latitude,
             longitude: options.longitude,
+            pageSize,
+            pageToken: pageParam,
           },
         });
 
         if (error) {
           console.error('Places search error:', error);
-          return [];
+          return { places: [], page: 1, pageSize, hasMore: false } as PlacesSearchResponse;
         }
 
-        // Transform Places API results to Gym format
-        return transformPlacesToGyms(data || []);
+        return data as PlacesSearchResponse;
       } catch (err) {
         console.error('useGymSearch error:', err);
-        return [];
+        return { places: [], page: 1, pageSize, hasMore: false } as PlacesSearchResponse;
       }
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextPageToken,
     enabled: searchQuery.length > 0 || filters.length > 0,
   });
+
+  // Flatten all pages into a single array of gyms
+  const results = data?.pages.flatMap((page) => transformPlacesToGyms(page.places || [])) || [];
 
   const toggleFilter = useCallback((filterId: string) => {
     setFilters((prev) =>
@@ -59,16 +83,26 @@ export function useGymSearch(options: SearchOptions = {}) {
     setFilters([]);
   }, []);
 
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   return {
     searchQuery,
     setSearchQuery,
     filters,
     toggleFilter,
     clearFilters,
-    results: (results as Gym[]) || [],
+    results: results as Gym[],
     isLoading,
     error,
     refetch,
+    // Pagination
+    loadMore,
+    hasNextPage: hasNextPage || false,
+    isFetchingNextPage,
   };
 }
 

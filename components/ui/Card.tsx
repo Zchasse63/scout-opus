@@ -18,7 +18,7 @@ import { spacing } from '../../constants/spacing';
 interface CardProps {
   children: React.ReactNode;
   onPress?: () => void;
-  style?: ViewStyle;
+  style?: ViewStyle | (ViewStyle | undefined)[];
   padding?: number;
   elevated?: boolean;
   pressable?: boolean;

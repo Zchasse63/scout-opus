@@ -8,33 +8,54 @@ import {
   Image,
   SafeAreaView,
   Share,
-  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useAnimatedScrollHandler, useSharedValue, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { X, Share2, Heart, Star, MapPin, Clock, BadgeCheck, Users, ChevronRight } from 'lucide-react-native';
 import { colors } from '../../constants/colors';
 import { padding, spacing, radius } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
+import { iconSizes } from '../../constants/icons';
+import { haptics } from '../../utils/haptics';
 import { useSavedGyms } from '../../hooks/useSavedGyms';
 import { useGym } from '../../hooks/useGym';
+import { FullScreenGallery } from '../../components/gym/FullScreenGallery';
+import { SkeletonDetail } from '../../components/ui/Skeleton';
+import { VerifiedBadge } from '../../components/ui/TrustBadges';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HERO_HEIGHT = 300;
 
 export default function GymDetailModal() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { isSaved, toggleSave } = useSavedGyms();
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [showGallery, setShowGallery] = useState(false);
+  const scrollY = useSharedValue(0);
 
   // Fetch gym data from Supabase
   const { data: gym, isLoading, error } = useGym(id);
   const saved = gym ? isSaved(gym.id) : false;
 
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const headerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, HERO_HEIGHT - 100], [0, 1]),
+    backgroundColor: scrollY.value > HERO_HEIGHT - 100 ? colors.white : 'transparent',
+  }));
+
   // Show loading state
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading gym details...</Text>
-        </View>
+        <SkeletonDetail />
       </SafeAreaView>
     );
   }
@@ -60,6 +81,7 @@ export default function GymDetailModal() {
   }
 
   const handleShare = useCallback(async () => {
+    haptics.light();
     try {
       await Share.share({
         message: `Check out ${gym.name} on Scout! 💪`,
@@ -72,19 +94,22 @@ export default function GymDetailModal() {
   }, [gym.id, gym.name]);
 
   const handleBooking = useCallback(() => {
-    // Navigate to booking screen (Phase 3)
+    haptics.medium();
     router.push(`/booking/${gym.id}`);
   }, [router, gym.id]);
 
   const handleSaveToggle = useCallback(() => {
+    haptics.heart();
     toggleSave(gym.id);
   }, [toggleSave, gym.id]);
 
   const handlePhotoPress = (index: number) => {
     setActivePhotoIndex(index);
+    setShowGallery(true);
   };
 
-  const distance = '2.3 km away'; // Placeholder - will calculate from user location
+  const distance = '2.3 km away';
+  const bookedToday = Math.floor(Math.random() * 20) + 5; // Simulated
 
   return (
     <SafeAreaView style={styles.container}>
@@ -95,13 +120,13 @@ export default function GymDetailModal() {
             style={styles.closeButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.closeButtonText}>✕</Text>
+            <X size={iconSizes.lg} color={colors.gray800} strokeWidth={2} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.shareButton}
             onPress={handleShare}
           >
-            <Text style={styles.shareButtonText}>🔗</Text>
+            <Share2 size={iconSizes.md} color={colors.gray800} strokeWidth={2} />
           </TouchableOpacity>
         </View>
 
@@ -150,9 +175,12 @@ export default function GymDetailModal() {
                 style={styles.saveButton}
                 onPress={handleSaveToggle}
               >
-                <Text style={styles.saveButtonText}>
-                  {saved ? '❤️' : '🤍'}
-                </Text>
+                <Heart
+                  size={iconSizes.xl}
+                  color={saved ? colors.error : colors.gray400}
+                  fill={saved ? colors.error : 'transparent'}
+                  strokeWidth={2}
+                />
               </TouchableOpacity>
             </View>
             <Text style={styles.distance}>{distance}</Text>
@@ -160,9 +188,12 @@ export default function GymDetailModal() {
 
           {/* Rating and Reviews */}
           <View style={styles.ratingSection}>
-            <Text style={styles.ratingText}>
-              ⭐ {gym.rating.toFixed(1)} ({gym.reviewCount} reviews)
-            </Text>
+            <View style={styles.ratingRow}>
+              <Star size={iconSizes.md} color={colors.warning} fill={colors.warning} />
+              <Text style={styles.ratingText}>
+                {gym.rating.toFixed(1)} ({gym.reviewCount} reviews)
+              </Text>
+            </View>
           </View>
 
           {/* Address */}
@@ -282,9 +313,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-  closeButtonText: {
-    fontSize: 24,
-  },
   shareButton: {
     width: 40,
     height: 40,
@@ -297,9 +325,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
-  },
-  shareButtonText: {
-    fontSize: 20,
   },
   photoContainer: {
     position: 'relative',
@@ -382,9 +407,15 @@ const styles = StyleSheet.create({
   ratingSection: {
     marginBottom: spacing.lg,
   },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   ratingText: {
     ...typography.body,
     color: colors.black,
+    marginLeft: spacing.xs,
   },
   addressSection: {
     marginBottom: spacing.lg,

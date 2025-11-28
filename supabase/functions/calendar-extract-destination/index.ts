@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.132.0/http/server.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
@@ -32,6 +33,10 @@ serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
+
+  // Validate JWT authentication
+  const authResult = await requireAuth(req);
+  if (authResult instanceof Response) return authResult;
 
   try {
     const { title, location, description, startDate, endDate } = await req.json() as ExtractDestinationRequest;

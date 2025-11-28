@@ -37,7 +37,7 @@ serve(async (req) => {
       .from('gyms')
       .select(`
         *,
-        reviews:gym_reviews(count),
+        reviews(count),
         photos:gym_photos(*)
       `)
       .eq('slug', gymSlug)

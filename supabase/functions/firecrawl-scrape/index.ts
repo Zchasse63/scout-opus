@@ -1,5 +1,29 @@
+/**
+ * Firecrawl Scrape Edge Function
+ *
+ * PURPOSE: Scrapes gym websites to extract structured data (amenities, pricing, hours, etc.)
+ * using the Firecrawl API with LLM extraction.
+ *
+ * STATUS: Reserved for Phase 6 - Data Pipeline (not currently used by frontend)
+ *
+ * USAGE: Admin-only function called via service role key
+ * - Scrapes a gym website URL
+ * - Extracts structured data using Firecrawl's LLM extraction
+ * - Stores results in scraping_queue table for review
+ * - Optionally updates gym record with scraped data
+ *
+ * REQUIRED ENV VARS:
+ * - FIRECRAWL_API_KEY: API key for Firecrawl service
+ * - SUPABASE_URL: Supabase project URL
+ * - SUPABASE_SERVICE_ROLE_KEY: Service role key for auth
+ *
+ * @see docs/PHASE_6_DATA_PIPELINE.md for implementation plan
+ * @see docs/SPEC_DATA_PIPELINE.md for data pipeline architecture
+ */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +52,15 @@ interface FirecrawlResult {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Validate service role key (admin-only function)
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.includes(SUPABASE_SERVICE_ROLE_KEY!)) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - service role key required' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {

@@ -164,8 +164,10 @@ export async function syncCalendarToTrips(): Promise<number> {
 
     // 4. For each parsed trip, upsert to database
     let createdCount = 0;
+    const tripsToAlert: ParsedTrip[] = [];
+
     for (const trip of parsedTrips) {
-      const { error } = await supabase.from('travel_periods').upsert(
+      const { data, error } = await supabase.from('travel_periods').upsert(
         {
           user_id: user.id,
           destination_city: trip.destinationCity,
@@ -182,16 +184,83 @@ export async function syncCalendarToTrips(): Promise<number> {
         {
           onConflict: 'user_id,source_event_id',
         }
-      );
+      ).select();
 
-      if (!error) {
+      if (!error && data) {
         createdCount++;
+        tripsToAlert.push(trip);
       }
+    }
+
+    // 5. Check for trips that warrant proactive alerts
+    if (tripsToAlert.length > 0) {
+      await checkAndSendTravelAlerts(user.id, tripsToAlert);
     }
 
     return createdCount;
   } catch (error) {
     console.error('Error syncing calendar to trips:', error);
     throw error;
+  }
+}
+
+/**
+ * Check upcoming trips and send proactive alerts
+ * Sends alerts for trips that are 7 days or 1 day away
+ */
+async function checkAndSendTravelAlerts(userId: string, trips: ParsedTrip[]): Promise<void> {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+
+  for (const trip of trips) {
+    const tripStart = new Date(trip.startDate);
+    const daysUntilTrip = Math.ceil((tripStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Only send alerts for trips 7 days or 1 day away
+    if (daysUntilTrip !== 7 && daysUntilTrip !== 1) {
+      continue;
+    }
+
+    // Check if we already sent an alert for this trip/timing combo
+    const alertKey = `${trip.sourceEventId}_${daysUntilTrip}d`;
+    const { data: existingAlert } = await supabase
+      .from('sent_alerts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('alert_key', alertKey)
+      .single();
+
+    if (existingAlert) {
+      continue; // Already sent this alert
+    }
+
+    // Count gyms near destination
+    const { count: gymCount } = await supabase.rpc('search_gyms_nearby', {
+      lat: trip.destinationLat,
+      lng: trip.destinationLng,
+      radius_meters: 10000, // 10km radius
+    });
+
+    // Send the travel alert notification
+    try {
+      await supabase.functions.invoke('notifications-travel-alert', {
+        body: {
+          userId,
+          destination: `${trip.destinationCity}, ${trip.destinationState || trip.destinationCountry}`,
+          daysUntilTrip,
+          gymCount: gymCount || 0,
+        },
+      });
+
+      // Record that we sent this alert
+      await supabase.from('sent_alerts').insert({
+        user_id: userId,
+        alert_key: alertKey,
+        alert_type: 'travel_alert',
+        sent_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Failed to send travel alert:', err);
+    }
   }
 }

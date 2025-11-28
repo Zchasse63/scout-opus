@@ -36,7 +36,8 @@ serve(async (req) => {
           'X-Goog-FieldMask':
             'id,displayName,formattedAddress,location,rating,userRatingCount,' +
             'googleMapsUri,websiteUri,regularOpeningHours,phoneNumber,' +
-            'currentOpeningHours,photos,reviews,types,priceLevel',
+            'currentOpeningHours,photos,reviews,types,priceLevel,generativeSummary,' +
+            'accessibilityOptions,parkingOptions,paymentOptions,reviewSummary,addressDescriptor',
         },
       }
     );
@@ -64,6 +65,18 @@ serve(async (req) => {
       types: placeDetails.types || [],
       regularHours: placeDetails.regularOpeningHours?.weekdayDescriptions || [],
       currentOpeningHours: placeDetails.currentOpeningHours || null,
+      // Google's AI-generated summary based on reviews
+      aiSummary: placeDetails.generativeSummary?.overview?.text || null,
+      // AI review summary (different from generativeSummary)
+      reviewSummary: placeDetails.reviewSummary?.text?.text || null,
+      // Accessibility options
+      accessibilityOptions: placeDetails.accessibilityOptions || null,
+      // Parking availability
+      parkingOptions: placeDetails.parkingOptions || null,
+      // Payment methods accepted
+      paymentOptions: placeDetails.paymentOptions || null,
+      // Location context (e.g., "Near Central Park")
+      addressDescriptor: placeDetails.addressDescriptor?.areaDescription || null,
       photos: placeDetails.photos?.map((photo: any) => ({
         name: photo.name,
         widthPx: photo.widthPx,

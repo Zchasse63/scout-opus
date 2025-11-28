@@ -7,10 +7,52 @@ jest.mock('expo/src/winter/installGlobal', () => ({}), { virtual: true });
 
 // Mock Expo constants
 jest.mock('expo-constants', () => ({
+  isDevice: true, // Simulate physical device for push notification tests
   expoConfig: {
     version: '1.0.0',
-    extra: { eas: { buildProfile: 'test' } },
+    extra: { eas: { buildProfile: 'test', projectId: 'test-project-id' } },
   },
+}));
+
+// Mock React Native Alert
+jest.mock('react-native/Libraries/Alert/Alert', () => ({
+  alert: jest.fn(),
+}));
+
+// Mock React Native Voice
+jest.mock('@react-native-voice/voice', () => ({
+  onSpeechStart: jest.fn(),
+  onSpeechEnd: jest.fn(),
+  onSpeechError: jest.fn(),
+  onSpeechResults: jest.fn(),
+  onSpeechPartialResults: jest.fn(),
+  startSpeech: jest.fn(),
+  stopSpeech: jest.fn(),
+  cancelSpeech: jest.fn(),
+  destroy: jest.fn(() => Promise.resolve()),
+  removeAllListeners: jest.fn(),
+}));
+
+// Mock AsyncStorage
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
+  getAllKeys: jest.fn(),
+  multiGet: jest.fn(),
+  multiSet: jest.fn(),
+  multiRemove: jest.fn(),
+}));
+
+// Mock react-native-maps
+jest.mock('react-native-maps', () => ({
+  __esModule: true,
+  default: jest.fn(() => null),
+  Marker: jest.fn(() => null),
+  Callout: jest.fn(() => null),
+  PROVIDER_DEFAULT: 'default',
+  PROVIDER_GOOGLE: 'google',
 }));
 
 // Mock Sentry
@@ -42,6 +84,7 @@ jest.mock('./lib/supabase', () => ({
       signInWithOtp: jest.fn(),
       signOut: jest.fn(),
       refreshSession: jest.fn(),
+      getUser: jest.fn(() => Promise.resolve({ data: { user: { id: 'test-user-123' } } })),
       onAuthStateChange: jest.fn(() => ({
         data: { subscription: { unsubscribe: jest.fn() } },
       })),
@@ -51,9 +94,16 @@ jest.mock('./lib/supabase', () => ({
     },
     from: jest.fn(() => ({
       select: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          order: jest.fn(() => Promise.resolve({ data: [], error: null })),
+        })),
         order: jest.fn(() => Promise.resolve({ data: [], error: null })),
       })),
-      insert: jest.fn(() => Promise.resolve({ error: null })),
+      insert: jest.fn(() => ({
+        select: jest.fn(() => ({
+          single: jest.fn(() => Promise.resolve({ data: null, error: null })),
+        })),
+      })),
       delete: jest.fn(() => ({
         eq: jest.fn(() => Promise.resolve({ error: null })),
       })),

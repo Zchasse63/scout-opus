@@ -1,0 +1,343 @@
+openapi: 3.0.3
+info:
+  title: Scout Fitness API
+  description: |
+    API documentation for Scout Fitness App Edge Functions.
+    All endpoints are Supabase Edge Functions deployed at `https://<project-ref>.supabase.co/functions/v1/`.
+  version: 1.0.0
+  contact:
+    name: Scout Fitness Team
+    email: support@scoutfitness.app
+
+servers:
+  - url: https://{project-ref}.supabase.co/functions/v1
+    description: Supabase Edge Functions
+    variables:
+      project-ref:
+        default: your-project-ref
+        description: Supabase project reference
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token from auth.getSession()
+    serviceRoleKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Supabase service role key for server-to-server calls
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+      required:
+        - error
+
+    Location:
+      type: object
+      properties:
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+      required:
+        - latitude
+        - longitude
+
+    Gym:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        dayPassPrice:
+          type: number
+        photos:
+          type: array
+          items:
+            type: string
+
+paths:
+  /voice-process-query:
+    post:
+      summary: Process voice search query
+      description: Parse natural language gym search query using AI
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transcript:
+                  type: string
+                  description: Voice transcript to process
+                  minLength: 1
+                  maxLength: 1000
+                userLocation:
+                  $ref: '#/components/schemas/Location'
+                conversationHistory:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, assistant]
+                      content:
+                        type: string
+                previousIntent:
+                  type: object
+                  additionalProperties: true
+              required:
+                - transcript
+      responses:
+        '200':
+          description: Parsed search intent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  intent:
+                    type: string
+                    enum: [search_gyms, refine_search, compare, get_details, book_pass]
+                  location:
+                    type: object
+                  facility_types:
+                    type: array
+                    items:
+                      type: string
+                  required_amenities:
+                    type: array
+                    items:
+                      type: string
+                  confidence:
+                    type: number
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /places-search:
+    post:
+      summary: Search for gyms
+      description: Search for gyms using Google Places API with pagination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                textQuery:
+                  type: string
+                  description: Search query
+                locationBias:
+                  type: object
+                  properties:
+                    circle:
+                      type: object
+                      properties:
+                        center:
+                          $ref: '#/components/schemas/Location'
+                        radius:
+                          type: number
+                pageSize:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 20
+                pageToken:
+                  type: string
+                  description: Token for next page
+              required:
+                - textQuery
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  places:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Gym'
+                  nextPageToken:
+                    type: string
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  hasMore:
+                    type: boolean
+
+  /send-push:
+    post:
+      summary: Send push notification
+      description: Send push notifications via Expo Push API
+      security:
+        - serviceRoleKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pushTokens:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  maxItems: 100
+                type:
+                  type: string
+                  enum: [booking_confirmed, booking_reminder, payment_received, support_update, travel_alert, streak_reminder, badge_earned]
+                data:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: number
+              required:
+                - pushTokens
+                - type
+                - data
+      responses:
+        '200':
+          description: Notifications sent
+        '401':
+          description: Unauthorized
+
+  /send-email:
+    post:
+      summary: Send email
+      description: Send transactional emails via Resend
+      security:
+        - serviceRoleKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to:
+                  type: string
+                  format: email
+                type:
+                  type: string
+                  enum: [partner_approved, partner_rejected, booking_confirmed, booking_cancelled, refund_processed, support_reply, welcome]
+                data:
+                  type: object
+              required:
+                - to
+                - type
+                - data
+      responses:
+        '200':
+          description: Email sent
+
+  /payments-create-intent:
+    post:
+      summary: Create payment intent
+      description: Create Stripe payment intent for gym pass purchase
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gymId:
+                  type: integer
+                passType:
+                  type: string
+                  enum: [day, week, month]
+                bookingDate:
+                  type: string
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+              required:
+                - gymId
+                - passType
+                - bookingDate
+      responses:
+        '200':
+          description: Payment intent created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clientSecret:
+                    type: string
+                  paymentIntentId:
+                    type: string
+
+  /bookings-validate-qr:
+    post:
+      summary: Validate booking QR code
+      description: Validate and mark a booking as used via QR scan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bookingId:
+                  type: integer
+                gymId:
+                  type: integer
+                scannedBy:
+                  type: string
+                  format: uuid
+              required:
+                - bookingId
+                - gymId
+                - scannedBy
+      responses:
+        '200':
+          description: Booking validated
+        '400':
+          description: Invalid or already used booking
+
