@@ -36,6 +36,54 @@ export default function PassesTab() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [qrModalVisible, setQrModalVisible] = useState(false);
 
+  // All hooks must be called before any early returns
+  const handleShowQR = useCallback((booking: Booking) => {
+    haptics.medium();
+    setSelectedBooking(booking);
+    setQrModalVisible(true);
+  }, []);
+
+  const handleCloseQR = useCallback(() => {
+    setQrModalVisible(false);
+    setSelectedBooking(null);
+  }, []);
+
+  const handleAddToWallet = useCallback((booking: Booking) => {
+    haptics.light();
+    // TODO: Implement Apple Wallet integration
+    console.log('Add to wallet:', booking.id);
+  }, []);
+
+  const handleGetDirections = useCallback((booking: Booking) => {
+    haptics.light();
+    // Open maps with gym address
+    const address = encodeURIComponent(booking.gymName || 'Gym');
+    const url = Platform.select({
+      ios: `maps:?q=${address}`,
+      android: `geo:0,0?q=${address}`,
+    });
+    if (url) Linking.openURL(url);
+  }, []);
+
+  // Categorize bookings (useMemo ensures consistent hook count)
+  const sections = useMemo(() => {
+    if (!bookings) return [];
+
+    const activeBookings = bookings.filter(
+      (b) => b.bookingDate === today && b.status !== 'cancelled'
+    );
+    const upcomingBookings = bookings.filter(
+      (b) => b.bookingDate > today && b.status !== 'cancelled'
+    );
+    const pastBookings = bookings.filter((b) => b.bookingDate < today);
+
+    return [
+      { title: 'Active Today', data: activeBookings },
+      { title: 'Upcoming', data: upcomingBookings },
+      { title: 'Past', data: pastBookings },
+    ].filter((s) => s.data.length > 0) as BookingSection[];
+  }, [bookings, today]);
+
   // Show loading state with skeleton
   if (isLoading) {
     return (
@@ -78,51 +126,6 @@ export default function PassesTab() {
       </SafeAreaView>
     );
   }
-
-  // Categorize bookings
-  const activeBookings = bookings?.filter(
-    (b) => b.bookingDate === today && b.status !== 'cancelled'
-  ) || [];
-
-  const upcomingBookings = bookings?.filter(
-    (b) => b.bookingDate > today && b.status !== 'cancelled'
-  ) || [];
-
-  const pastBookings = bookings?.filter((b) => b.bookingDate < today) || [];
-
-  const sections: BookingSection[] = [
-    { title: 'Active Today', data: activeBookings },
-    { title: 'Upcoming', data: upcomingBookings },
-    { title: 'Past', data: pastBookings },
-  ].filter((s) => s.data.length > 0);
-
-  const handleShowQR = useCallback((booking: Booking) => {
-    haptics.medium();
-    setSelectedBooking(booking);
-    setQrModalVisible(true);
-  }, []);
-
-  const handleCloseQR = useCallback(() => {
-    setQrModalVisible(false);
-    setSelectedBooking(null);
-  }, []);
-
-  const handleAddToWallet = useCallback((booking: Booking) => {
-    haptics.light();
-    // TODO: Implement Apple Wallet integration
-    console.log('Add to wallet:', booking.id);
-  }, []);
-
-  const handleGetDirections = useCallback((booking: Booking) => {
-    haptics.light();
-    // Open maps with gym address
-    const address = encodeURIComponent(booking.gymName || 'Gym');
-    const url = Platform.select({
-      ios: `maps:?q=${address}`,
-      android: `geo:0,0?q=${address}`,
-    });
-    if (url) Linking.openURL(url);
-  }, []);
 
   // Generate QR code data for a booking
   const generateQRData = (booking: Booking): string => {
