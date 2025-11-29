@@ -16,9 +16,13 @@ import { colors } from '../../constants/colors';
 import { spacing, padding } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
 
+// Always show dev login in simulator/development
+const __DEV__ = true;
+
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const { signIn, isLoading, error } = useAuthStore();
+  const [email, setEmail] = useState(__DEV__ ? 'dev@scout.test' : '');
+  const [password, setPassword] = useState(__DEV__ ? 'devtest123' : '');
+  const { signIn, signInWithPassword, signUp, isLoading, error } = useAuthStore();
 
   const handleAppleSignIn = async () => {
     try {
@@ -49,6 +53,31 @@ export default function LoginScreen() {
     }
   };
 
+  const handleDevLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+    try {
+      await signInWithPassword(email, password);
+    } catch (error) {
+      Alert.alert('Sign In Error', error instanceof Error ? error.message : 'An error occurred');
+    }
+  };
+
+  const handleDevSignUp = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+    try {
+      await signUp(email, password);
+      Alert.alert('Success', 'Account created! You are now signed in.');
+    } catch (error) {
+      Alert.alert('Sign Up Error', error instanceof Error ? error.message : 'An error occurred');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -63,62 +92,115 @@ export default function LoginScreen() {
 
         {/* Sign In Options */}
         <View style={styles.signInSection}>
-          {/* Apple Sign In */}
-          <TouchableOpacity
-            style={[styles.button, styles.appleButton]}
-            onPress={handleAppleSignIn}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.buttonText}>Sign in with Apple</Text>
-            )}
-          </TouchableOpacity>
+          {__DEV__ ? (
+            <>
+              {/* Dev Mode: Email/Password Login */}
+              <View style={styles.devBanner}>
+                <Text style={styles.devBannerText}>🛠 Development Mode</Text>
+              </View>
 
-          {/* Google Sign In */}
-          <TouchableOpacity
-            style={[styles.button, styles.googleButton]}
-            onPress={handleGoogleSignIn}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={colors.black} />
-            ) : (
-              <Text style={[styles.buttonText, { color: colors.black }]}>Sign in with Google</Text>
-            )}
-          </TouchableOpacity>
+              <TextInput
+                style={styles.emailInput}
+                placeholder="Email"
+                placeholderTextColor={colors.gray500}
+                value={email}
+                onChangeText={setEmail}
+                editable={!isLoading}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
 
-          {/* Divider */}
-          <View style={styles.dividerSection}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
+              <TextInput
+                style={styles.emailInput}
+                placeholder="Password"
+                placeholderTextColor={colors.gray500}
+                value={password}
+                onChangeText={setPassword}
+                editable={!isLoading}
+                secureTextEntry
+              />
 
-          {/* Email Sign In */}
-          <TextInput
-            style={styles.emailInput}
-            placeholder="Enter your email"
-            placeholderTextColor={colors.gray500}
-            value={email}
-            onChangeText={setEmail}
-            editable={!isLoading}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+              <TouchableOpacity
+                style={[styles.button, styles.emailButton]}
+                onPress={handleDevLogin}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, styles.emailButton]}
-            onPress={handleEmailSignIn}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.buttonText}>Send Magic Link</Text>
-            )}
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.signUpButton]}
+                onPress={handleDevSignUp}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Text style={[styles.buttonText, { color: colors.primary }]}>Create Account</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Production: OAuth + Magic Link */}
+              <TouchableOpacity
+                style={[styles.button, styles.appleButton]}
+                onPress={handleAppleSignIn}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.buttonText}>Sign in with Apple</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.googleButton]}
+                onPress={handleGoogleSignIn}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.black} />
+                ) : (
+                  <Text style={[styles.buttonText, { color: colors.black }]}>Sign in with Google</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.dividerSection}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <TextInput
+                style={styles.emailInput}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.gray500}
+                value={email}
+                onChangeText={setEmail}
+                editable={!isLoading}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <TouchableOpacity
+                style={[styles.button, styles.emailButton]}
+                onPress={handleEmailSignIn}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.buttonText}>Send Magic Link</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Error Message */}
@@ -231,5 +313,22 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.gray500,
     textAlign: 'center',
+  },
+  devBanner: {
+    backgroundColor: '#fef3c7',
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  devBannerText: {
+    ...typography.caption,
+    color: '#92400e',
+    fontWeight: '600',
+  },
+  signUpButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
 });

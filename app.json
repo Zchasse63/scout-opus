@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -45,12 +45,6 @@
         "expo-calendar",
         {
           "calendarPermission": "The app uses your calendar to detect upcoming trips for gym recommendations."
-        }
-      ],
-      [
-        "expo-image",
-        {
-          "cachePolicy": "memory-disk"
         }
       ]
     ],

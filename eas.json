@@ -19,8 +19,7 @@
       "distribution": "internal",
       "ios": {
         "resourceClass": "m-medium",
-        "simulator": false,
-        "bundleIdentifier": "com.scoutfitness.app"
+        "simulator": false
       },
       "android": {
         "buildType": "apk"
@@ -32,8 +31,7 @@
     "production": {
       "distribution": "store",
       "ios": {
-        "resourceClass": "m-medium",
-        "bundleIdentifier": "com.scoutfitness.app"
+        "resourceClass": "m-medium"
       },
       "android": {
         "buildType": "app-bundle"

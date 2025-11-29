@@ -81,7 +81,9 @@ export async function registerPushToken(): Promise<void> {
 
     const pushToken = await getPushToken();
     if (!pushToken) {
-      throw new Error('Failed to get push token');
+      // Silently return on simulator - push notifications don't work there
+      console.log('Push token not available (likely running on simulator)');
+      return;
     }
 
     // Store push token in user metadata

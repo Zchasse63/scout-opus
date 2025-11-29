@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
@@ -89,7 +89,6 @@ async function unsaveGym(gymId: string): Promise<void> {
 
 export function useSavedGyms() {
   const queryClient = useQueryClient();
-  const [savedGymIds, setSavedGymIds] = useState<Set<string>>(new Set());
 
   // Fetch saved gyms
   const { data: savedGyms = [], isLoading } = useQuery({
@@ -98,16 +97,16 @@ export function useSavedGyms() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Update local state when data changes
-  useEffect(() => {
-    setSavedGymIds(new Set(savedGyms.map((g) => g.gymId)));
-  }, [savedGyms]);
+  // Derive savedGymIds from savedGyms using useMemo (no useState/useEffect loop)
+  const savedGymIds = useMemo(
+    () => new Set(savedGyms.map((g) => g.gymId)),
+    [savedGyms]
+  );
 
   // Save gym
   const saveMutation = useMutation({
     mutationFn: saveGym,
-    onSuccess: (_, gymId) => {
-      setSavedGymIds((prev) => new Set([...prev, gymId]));
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-gyms'] });
     },
   });
@@ -115,12 +114,7 @@ export function useSavedGyms() {
   // Unsave gym
   const unsaveMutation = useMutation({
     mutationFn: unsaveGym,
-    onSuccess: (_, gymId) => {
-      setSavedGymIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(gymId);
-        return newSet;
-      });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-gyms'] });
     },
   });

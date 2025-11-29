@@ -8,6 +8,8 @@ interface AuthStore {
   isLoading: boolean;
   error: string | null;
   signIn: (provider: 'apple' | 'google' | 'email', email?: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   clearError: () => void;
@@ -48,6 +50,47 @@ export const useAuthStore = create<AuthStore>((set) => ({
         if (error) throw error;
       }
       set({ isLoading: false });
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'An error occurred',
+      });
+      throw error;
+    }
+  },
+
+  signInWithPassword: async (email: string, password: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      set({ user: data.user, session: data.session, isLoading: false });
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'An error occurred',
+      });
+      throw error;
+    }
+  },
+
+  signUp: async (email: string, password: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (error) throw error;
+      // Auto sign-in after signup if email confirmation is disabled
+      if (data.session) {
+        set({ user: data.user, session: data.session, isLoading: false });
+      } else {
+        set({ isLoading: false });
+      }
     } catch (error) {
       set({
         isLoading: false,
